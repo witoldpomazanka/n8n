@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Telegram Auth</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 0 20px;
+            line-height: 1.6;
+        }
+        .status {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .error {
+            background-color: #fee2e2;
+            border: 1px solid #ef4444;
+            color: #991b1b;
+        }
+        .info {
+            background-color: #dbeafe;
+            border: 1px solid #3b82f6;
+            color: #1e40af;
+        }
+        .success {
+            background-color: #dcfce7;
+            border: 1px solid #22c55e;
+            color: #166534;
+        }
+        button {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #2563eb;
+        }
+        button:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+        input {
+            padding: 8px;
+            font-size: 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        .hidden {
+            display: none;
+        }
+        #countdown {
+            color: #4b5563;
+            margin-top: 10px;
+        }
+        #messages {
+            margin-top: 20px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            padding: 15px;
+        }
+        .message {
+            padding: 10px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .message:last-child {
+            border-bottom: none;
+        }
+        .message-header {
+            color: #4b5563;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+        .message-content {
+            white-space: pre-wrap;
+        }
+        .nav {
+            margin: 20px 0;
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+    </style>
+</head>
+<body>
+    <div id="status" class="status info">
+        Sprawdzanie statusu sesji...
+    </div>
+
+    <div id="requestCode" class="hidden">
+        <button onclick="requestCode()">Wyślij kod weryfikacyjny</button>
+    </div>
+
+    <div id="enterCode" class="hidden">
+        <input type="text" id="code" placeholder="Wprowadź kod">
+        <button onclick="submitCode()">Zatwierdź</button>
+        <div id="countdown"></div>
+    </div>
+
+    <div id="nav" class="nav hidden">
+        <button onclick="showMessages()">Pokaż wiadomości</button>
+        <button onclick="hideMessages()">Ukryj wiadomości</button>
+    </div>
+
+    <div id="messages" class="hidden">
+        <h2>Historia wiadomości</h2>
+        <div id="messagesList"></div>
+    </div>
+
+    <script>
+        let timeoutId;
+        let countdownInterval;
+        let messagesUpdateInterval;
+
+        function updateStatus(message, type) {
+            const status = document.getElementById('status');
+            status.className = 'status ' + type;
+            status.textContent = message;
+        }
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleString('pl-PL');
+        }
+
+        function updateMessages() {
+            fetch('/messages')
+                .then(response => response.json())
+                .then(data => {
+                    const messagesList = document.getElementById('messagesList');
+                    messagesList.innerHTML = '';
+                    data.messages.reverse().forEach(msg => {
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = 'message';
+                        messageDiv.innerHTML = `
+                            <div class="message-header">
+                                <strong>${msg.sender_name}</strong> w ${msg.chat_title || 'czacie prywatnym'}
+                                <br>
+                                Wysłano: ${formatDate(msg.timestamp)}
+                                <br>
+                                Odebrano: ${formatDate(msg.received_at)}
+                            </div>
+                            <div class="message-content">${msg.message}</div>
+                        `;
+                        messagesList.appendChild(messageDiv);
+                    });
+                })
+                .catch(error => {
+                    console.error('Błąd pobierania wiadomości:', error);
+                });
+        }
+
+        function showMessages() {
+            document.getElementById('messages').classList.remove('hidden');
+            updateMessages();
+            // Aktualizuj co 5 sekund
+            messagesUpdateInterval = setInterval(updateMessages, 5000);
+        }
+
+        function hideMessages() {
+            document.getElementById('messages').classList.add('hidden');
+            if (messagesUpdateInterval) {
+                clearInterval(messagesUpdateInterval);
+            }
+        }
+
+        function startCountdown(seconds) {
+            const countdownElement = document.getElementById('countdown');
+            let timeLeft = seconds;
+
+            countdownInterval = setInterval(() => {
+                const minutes = Math.floor(timeLeft / 60);
+                const secs = timeLeft % 60;
+                countdownElement.textContent = `Pozostało: ${minutes}:${secs.toString().padStart(2, '0')}`;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(countdownInterval);
+                    updateStatus('Przekroczono czas oczekiwania na kod. Odśwież stronę aby spróbować ponownie.', 'error');
+                    document.getElementById('enterCode').classList.add('hidden');
+                }
+                timeLeft--;
+            }, 1000);
+        }
+
+        function requestCode() {
+            document.getElementById('requestCode').classList.add('hidden');
+            updateStatus('Wysyłanie kodu weryfikacyjnego...', 'info');
+
+            fetch('/request_code', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateStatus('Kod został wysłany na Twój telefon. Wprowadź go poniżej.', 'info');
+                        document.getElementById('enterCode').classList.remove('hidden');
+                        startCountdown(300); // 5 minut
+                    } else {
+                        updateStatus('Błąd: ' + data.error, 'error');
+                        document.getElementById('requestCode').classList.remove('hidden');
+                    }
+                })
+                .catch(error => {
+                    updateStatus('Błąd połączenia: ' + error, 'error');
+                    document.getElementById('requestCode').classList.remove('hidden');
+                });
+        }
+
+        function submitCode() {
+            const code = document.getElementById('code').value.trim();
+            if (!code) {
+                updateStatus('Wprowadź kod weryfikacyjny', 'error');
+                return;
+            }
+
+            document.getElementById('enterCode').classList.add('hidden');
+            updateStatus('Weryfikacja kodu...', 'info');
+
+            fetch('/verify_code', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ code: code })
+            })
+            .then(response => response.json())
+            .then(data => {
+                clearInterval(countdownInterval);
+                if (data.success) {
+                    updateStatus('Zalogowano pomyślnie!', 'success');
+                    document.getElementById('nav').classList.remove('hidden');
+                } else {
+                    updateStatus('Błąd: ' + data.error, 'error');
+                    document.getElementById('requestCode').classList.remove('hidden');
+                }
+            })
+            .catch(error => {
+                clearInterval(countdownInterval);
+                updateStatus('Błąd połączenia: ' + error, 'error');
+                document.getElementById('requestCode').classList.remove('hidden');
+            });
+        }
+
+        // Sprawdź status sesji przy ładowaniu strony
+        fetch('/check_session')
+            .then(response => response.json())
+            .then(data => {
+                if (data.authorized) {
+                    updateStatus('Sesja aktywna, nasłuchiwanie wiadomości...', 'success');
+                    document.getElementById('nav').classList.remove('hidden');
+                } else {
+                    updateStatus('Wymagana autoryzacja', 'info');
+                    document.getElementById('requestCode').classList.remove('hidden');
+                }
+            })
+            .catch(error => {
+                updateStatus('Błąd sprawdzania sesji: ' + error, 'error');
+                document.getElementById('requestCode').classList.remove('hidden');
+            });
+    </script>
+</body>
+</html> 
