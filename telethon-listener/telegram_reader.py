@@ -124,6 +124,7 @@ async def init_database():
                     message TEXT,
                     chat_id TEXT,
                     chat_title TEXT,
+                    chat_type TEXT,
                     sender_id TEXT,
                     sender_name TEXT,
                     timestamp TIMESTAMPTZ,
@@ -134,6 +135,18 @@ async def init_database():
                 logger.info("Tabela została utworzona pomyślnie")
             else:
                 logger.info(f"Tabela {TELEGRAM_MESSAGES_TABLE} już istnieje")
+                
+                # Sprawdzamy czy kolumna chat_type istnieje
+                column_exists = await conn.fetchval(
+                    "SELECT EXISTS (SELECT FROM information_schema.columns WHERE table_name = $1 AND column_name = 'chat_type')",
+                    TELEGRAM_MESSAGES_TABLE
+                )
+                
+                # Jeśli nie istnieje, dodajemy ją
+                if not column_exists:
+                    logger.info(f"Dodawanie kolumny chat_type do tabeli {TELEGRAM_MESSAGES_TABLE}...")
+                    await conn.execute(f"ALTER TABLE {TELEGRAM_MESSAGES_TABLE} ADD COLUMN chat_type TEXT")
+                    logger.info("Kolumna chat_type została dodana pomyślnie")
         
         return True
     except Exception as e:
@@ -158,21 +171,23 @@ async def save_message_to_db(message_data):
             await conn.execute(
                 f'''
                 INSERT INTO {TELEGRAM_MESSAGES_TABLE} 
-                (message, chat_id, chat_title, sender_id, sender_name, timestamp, received_at, is_new)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                (message, chat_id, chat_title, chat_type, sender_id, sender_name, timestamp, received_at, is_new)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                 ''',
                 message_data['message'],
                 message_data['chat_id'],
                 message_data['chat_title'],
+                message_data.get('chat_type', 'unknown'),  # Obsługa wiadomości bez określonego typu czatu
                 message_data['sender_id'],
                 message_data['sender_name'],
                 timestamp,
                 received_at,
-                True  # is_new
+                message_data.get('is_new', True)  # Domyślnie nowa wiadomość
             )
             logger.info(f"Wiadomość została zapisana do bazy danych")
     except Exception as e:
         logger.error(f"Błąd podczas zapisywania wiadomości do bazy danych: {str(e)}")
+        logger.exception(e)
 
 
 async def get_latest_message_timestamp():
@@ -248,7 +263,21 @@ async def load_historical_messages():
         
         # Iterujemy przez wszystkie dialogi
         async for dialog in client.iter_dialogs():
-            logger.info(f"Pobieranie wiadomości z dialogu: {dialog.name} (id: {dialog.id})")
+            # Określamy typ czatu
+            chat = dialog.entity
+            chat_type = 'unknown'
+            
+            if isinstance(chat, User):
+                chat_type = 'private'
+            elif isinstance(chat, Chat):
+                chat_type = 'group'
+            elif isinstance(chat, Channel):
+                if getattr(chat, 'broadcast', False):
+                    chat_type = 'channel'
+                else:
+                    chat_type = 'supergroup'
+            
+            logger.info(f"Pobieranie wiadomości z dialogu: {dialog.name} (id: {dialog.id}, typ: {chat_type})")
             
             # Pobieramy wiadomości z dialogu (limit 100 per dialog)
             messages_to_process = []
@@ -265,8 +294,8 @@ async def load_historical_messages():
                 try:
                     chat = await message.get_chat()
                     sender = await message.get_sender()
-                    sender_name = getattr(sender, 'first_name', '')
-                    if getattr(sender, 'last_name', None):
+                    sender_name = getattr(sender, 'first_name', '') if sender else ''
+                    if sender and getattr(sender, 'last_name', None):
                         sender_name += ' ' + sender.last_name
                     
                     message_timezone = message.date.tzinfo
@@ -274,11 +303,13 @@ async def load_historical_messages():
                     message_data = {
                         'message': message.text,
                         'chat_id': str(chat.id),
-                        'chat_title': getattr(chat, 'title', None),
-                        'sender_id': str(sender.id),
-                        'sender_name': sender_name,
+                        'chat_title': getattr(chat, 'title', None) or getattr(chat, 'username', None) or 'Prywatny',
+                        'chat_type': chat_type,
+                        'sender_id': str(sender.id if sender else 0),
+                        'sender_name': sender_name or 'Nieznany',
                         'timestamp': message.date,  # Używamy obiektu datetime zamiast stringa
-                        'received_at': datetime.now(message_timezone)  # Używamy obiektu datetime zamiast stringa
+                        'received_at': datetime.now(message_timezone),  # Używamy obiektu datetime zamiast stringa
+                        'is_new': False  # Historyczne wiadomości nie są nowe
                     }
                     
                     # Zapisujemy wiadomość do bazy danych
@@ -286,6 +317,7 @@ async def load_historical_messages():
                     added_messages += 1
                 except Exception as e:
                     logger.error(f"Błąd podczas przetwarzania wiadomości historycznej: {str(e)}")
+                    logger.exception(e)
         
         logger.info(f"Dodano {added_messages} nowych wiadomości do bazy danych")
         
@@ -298,6 +330,7 @@ async def load_historical_messages():
         return True
     except Exception as e:
         logger.error(f"Błąd podczas ładowania historycznych wiadomości: {str(e)}")
+        logger.exception(e)
         return False
 
 
@@ -360,6 +393,19 @@ async def handle_new_message(event):
     try:
         chat = await event.get_chat()
         sender = await event.get_sender()
+        
+        # Określamy typ czatu
+        chat_type = 'unknown'
+        if isinstance(chat, User):
+            chat_type = 'private'
+        elif isinstance(chat, Chat):
+            chat_type = 'group'
+        elif isinstance(chat, Channel):
+            if getattr(chat, 'broadcast', False):
+                chat_type = 'channel'
+            else:
+                chat_type = 'supergroup'
+        
         sender_name = getattr(sender, 'first_name', '')
         if getattr(sender, 'last_name', None):
             sender_name += ' ' + sender.last_name
@@ -370,9 +416,10 @@ async def handle_new_message(event):
         message_data = {
             'message': event.raw_text,
             'chat_id': str(chat.id),
-            'chat_title': getattr(chat, 'title', None),
-            'sender_id': str(sender.id),
-            'sender_name': sender_name,
+            'chat_title': getattr(chat, 'title', None) or getattr(chat, 'username', None) or 'Prywatny',
+            'chat_type': chat_type,
+            'sender_id': str(sender.id if sender else 0),
+            'sender_name': sender_name or 'Nieznany',
             'timestamp': event.date,  # Używamy obiektu datetime zamiast stringa
             'received_at': datetime.now(message_timezone),  # Używamy obiektu datetime zamiast stringa
             'is_new': True
@@ -386,7 +433,8 @@ async def handle_new_message(event):
         logger.info(f"""
 Nowa wiadomość:
 Od: {log_data['sender_name']} ({log_data['sender_id']})
-Czat: {log_data['chat_title'] or 'Prywatny'} ({log_data['chat_id']})
+Czat: {log_data['chat_title']} ({log_data['chat_id']})
+Typ czatu: {log_data['chat_type']}
 Treść: {log_data['message']}
 Wysłano: {log_data['timestamp']}
 Odebrano: {log_data['received_at']}
@@ -530,6 +578,28 @@ async def init_client():
     return client
 
 
+async def reload_messages(request):
+    """Endpunkt do ręcznego ponownego załadowania wiadomości"""
+    logger.info("=== reload_messages ===")
+    global client
+    
+    if not client or not client.is_connected():
+        return web.json_response({'success': False, 'error': 'Klient nie jest połączony'})
+        
+    try:
+        # Pobieranie i zapisywanie historycznych wiadomości
+        success = await load_historical_messages()
+        
+        if success:
+            return web.json_response({'success': True, 'message': 'Wiadomości zostały ponownie załadowane'})
+        else:
+            return web.json_response({'success': False, 'error': 'Błąd podczas ładowania wiadomości'})
+    except Exception as e:
+        logger.error(f"Błąd podczas ponownego ładowania wiadomości: {str(e)}")
+        logger.exception(e)
+        return web.json_response({'success': False, 'error': str(e)})
+
+
 async def main():
     """Główna funkcja programu"""
     global client
@@ -554,6 +624,7 @@ async def main():
     app.router.add_post('/request_code', request_code)
     app.router.add_post('/verify_code', verify_code)
     app.router.add_get('/check_session', check_session)
+    app.router.add_get('/reload', reload_messages)  # Nowy endpoint do ponownego ładowania wiadomości
     
     # Obsługa WebSocketa
     async def websocket_route_handler(request):

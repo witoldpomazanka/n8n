@@ -49,6 +49,17 @@ docker compose up -d
 
 6. Wszystkie wiadomości będą automatycznie wysyłane do webhooka n8n.
 
+7. Interfejs pgAdmin jest dostępny pod adresem: http://localhost:8081
+   - Login: wartość PGADMIN_DEFAULT_EMAIL (domyślnie admin@example.com)
+   - Hasło: wartość PGADMIN_DEFAULT_PASSWORD (domyślnie admin)
+   - Dodaj nowy serwer w pgAdmin:
+     - Nazwa: dowolna (np. "n8n-postgres")
+     - Host: postgres
+     - Port: 5432
+     - Baza danych: wartość POSTGRES_DB
+     - Użytkownik: wartość POSTGRES_USER
+     - Hasło: wartość POSTGRES_PASSWORD
+
 ## Zarządzanie kontenerami
 
 1. Zatrzymanie kontenerów:
