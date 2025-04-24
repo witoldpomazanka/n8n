@@ -5,3 +5,4 @@ __pycache__/
 *.pyd
 .Python
 .idea
+.DS_Store
