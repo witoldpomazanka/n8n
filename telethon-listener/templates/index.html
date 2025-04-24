@@ -46,11 +46,15 @@
             background-color: #f59e0b;
         }
         .message {
-            background-color: white;
+            background-color: #e7f1ff; /* Jasny błękit dla starych wiadomości */
             border-radius: 8px;
             padding: 15px;
             margin-bottom: 15px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: background-color 0.5s ease;
+        }
+        .message.new {
+            background-color: #d1fae5; /* Jasny zielony dla nowych wiadomości */
         }
         .message-header {
             display: flex;
@@ -122,6 +126,15 @@
         }
         #messages-container {
             margin-top: 20px;
+            max-height: 80vh;  /* 80% wysokości ekranu */
+            overflow-y: auto;  /* Dodajemy pasek przewijania */
+        }
+        
+        /* Wyświetlanie od najnowszej (góra) do najstarszej (dół) */
+        #messagesList {
+            display: flex;
+            flex-direction: column-reverse;
+            width: 100%;
         }
     </style>
 </head>
@@ -185,7 +198,7 @@
 
         function createMessageElement(message) {
             const div = document.createElement('div');
-            div.className = 'message';
+            div.className = message.is_new ? 'message new' : 'message';
             div.innerHTML = `
                 <div class="message-header">
                     <span class="sender-name">${message.sender_name}</span>
@@ -202,52 +215,94 @@
 
         function addMessage(message) {
             const messageElement = createMessageElement(message);
-            messagesContainer.insertBefore(messageElement, messagesContainer.firstChild);
+            
+            if (message.is_new) {
+                // Nowe wiadomości zawsze na górze
+                messagesContainer.prepend(messageElement);
+            } else {
+                // Stare wiadomości zgodnie z sortowaniem
+                messagesContainer.appendChild(messageElement);
+            }
         }
 
         function connectWebSocket() {
-            // Użyj aktualnego hosta i portu 8765
+            // Użyj aktualnego hosta, bez specyfikacji portu 8765
             const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
             const wsHost = window.location.hostname;
-            const wsUrl = `${wsProtocol}${wsHost}:8765`;
+            // Używamy portu 8080 (tego samego co serwer HTTP) lub aktualnego portu jeśli jest inny niż 80/443
+            const port = window.location.port ? window.location.port : '8080';
+            const wsUrl = `${wsProtocol}${wsHost}:${port}/ws`;
             
             console.log(`Łączenie z WebSocket: ${wsUrl}`);
             websocketStatusElement.textContent = 'WebSocket: Łączenie...';
             websocketStatusElement.className = 'websocket-status disconnected';
             
-            ws = new WebSocket(wsUrl);
-
-            ws.onopen = () => {
-                websocketStatusElement.textContent = 'WebSocket: Nasłuchuje';
-                websocketStatusElement.className = 'websocket-status connected';
-                console.log('WebSocket połączony');
-            };
-
-            ws.onclose = (event) => {
-                websocketStatusElement.textContent = 'WebSocket: Rozłączony';
+            try {
+                ws = new WebSocket(wsUrl);
+            
+                ws.onopen = () => {
+                    websocketStatusElement.textContent = 'WebSocket: Nasłuchuje';
+                    websocketStatusElement.className = 'websocket-status connected';
+                    console.log('WebSocket połączony');
+                };
+                
+                ws.onclose = (event) => {
+                    websocketStatusElement.textContent = 'WebSocket: Rozłączony';
+                    websocketStatusElement.className = 'websocket-status disconnected';
+                    console.log(`WebSocket rozłączony, kod: ${event.code}, powód: ${event.reason}`);
+                    setTimeout(connectWebSocket, 5000); // Próbuj ponownie co 5 sekund
+                };
+                
+                ws.onerror = (error) => {
+                    console.error('Błąd WebSocket:', error);
+                    websocketStatusElement.textContent = 'WebSocket: Błąd połączenia';
+                    websocketStatusElement.className = 'websocket-status disconnected';
+                };
+                
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        
+                        if (data.type === 'history') {
+                            // Czyścimy kontener wiadomości
+                            messagesContainer.innerHTML = '';
+                            
+                            if (data.messages && data.messages.length > 0) {
+                                // Sortujemy od najstarszej do najnowszej (ponieważ kontener jest odwrócony)
+                                const sortedMessages = data.messages.sort((a, b) => {
+                                    return new Date(a.timestamp) - new Date(b.timestamp);
+                                });
+                                
+                                // Dodajemy wiadomości - w kontenerze będą w odwróconej kolejności
+                                sortedMessages.forEach(message => {
+                                    const messageElement = createMessageElement(message);
+                                    messagesContainer.appendChild(messageElement);
+                                });
+                            }
+                        } else if (data.type === 'new_message') {
+                            // Dodajemy nową wiadomość (zawsze jako nową)
+                            data.message.is_new = true;
+                            
+                            // Nowa wiadomość to najpierw tworzymy element
+                            const messageElement = createMessageElement(data.message);
+                            // Dodajemy na koniec listy (ale przez odwróconą kolejność będzie na górze)
+                            messagesContainer.appendChild(messageElement);
+                            
+                            // Po 10 minutach zmieniamy kolor na standardowy
+                            setTimeout(() => {
+                                messageElement.classList.remove('new');
+                            }, 600000);
+                        }
+                    } catch (error) {
+                        console.error('Błąd przetwarzania danych WebSocket:', error);
+                    }
+                };
+            } catch (error) {
+                console.error('Błąd tworzenia WebSocket:', error);
+                websocketStatusElement.textContent = 'WebSocket: Błąd inicjalizacji';
                 websocketStatusElement.className = 'websocket-status disconnected';
-                console.log(`WebSocket rozłączony, kod: ${event.code}, powód: ${event.reason}`);
-                setTimeout(connectWebSocket, 1000);
-            };
-
-            ws.onerror = (error) => {
-                console.error('Błąd WebSocket:', error);
-            };
-
-            ws.onmessage = (event) => {
-                console.log('Otrzymano wiadomość WebSocket:', event.data);
-                const data = JSON.parse(event.data);
-                if (data.type === 'history') {
-                    // Wyświetlamy historię wiadomości
-                    messagesContainer.innerHTML = '';
-                    data.messages.forEach(message => {
-                        addMessage(message);
-                    });
-                } else if (data.type === 'new_message') {
-                    // Dodajemy nową wiadomość
-                    addMessage(data.message);
-                }
-            };
+                setTimeout(connectWebSocket, 5000); // Próbuj ponownie co 5 sekund
+            }
         }
 
         function startCountdown(seconds) {

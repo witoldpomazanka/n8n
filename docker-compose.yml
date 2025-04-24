@@ -47,10 +47,16 @@ services:
       - TELEGRAM_PHONE=${TELEGRAM_PHONE}
       - N8N_WEBHOOK_URL=http://n8n:5678/webhook/telegram
       - TELEGRAM_SESSION_DIR=/data
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
     volumes:
       - telethon_session:/data
     depends_on:
       - n8n
+      - postgres
 
 volumes:
   n8n_postgres_data:
