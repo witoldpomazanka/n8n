@@ -11,6 +11,10 @@ import pathlib
 from collections import deque
 from datetime import datetime
 import sys
+from telethon.tl.types import User, Channel, Chat
+import websockets
+import threading
+from queue import Queue
 
 # Konfiguracja logowania
 logger = logging.getLogger('telegram_reader')
@@ -40,6 +44,12 @@ client = None
 # Bufor na ostatnie wiadomości (max 100)
 message_history = deque(maxlen=100)
 
+# Kolejka do komunikacji między wątkami
+message_queue = Queue()
+
+# Lista aktywnych połączeń WebSocket
+websocket_clients = set()
+
 logger.info("=== START APLIKACJI ===")
 logger.info(f"API_ID: {API_ID}")
 logger.info(f"API_HASH: {'*' * len(API_HASH) if API_HASH else 'None'}")
@@ -61,6 +71,39 @@ async def send_to_webhook(data):
                     logger.error(f"Błąd podczas wysyłania do webhooka: {response.status}")
         except Exception as e:
             logger.error(f"Błąd podczas wysyłania do webhooka: {str(e)}")
+
+
+async def websocket_handler(websocket, path):
+    """Obsługa połączeń WebSocket"""
+    websocket_clients.add(websocket)
+    try:
+        # Wysyłamy historię wiadomości nowemu klientowi
+        await websocket.send(json.dumps({
+            'type': 'history',
+            'messages': list(message_history)
+        }))
+        
+        # Nasłuchujemy na wiadomości od klienta
+        async for message in websocket:
+            # Możemy dodać obsługę wiadomości od klienta jeśli będzie potrzebna
+            pass
+    except websockets.exceptions.ConnectionClosed:
+        pass
+    finally:
+        websocket_clients.remove(websocket)
+
+
+async def broadcast_message(message):
+    """Wysyła wiadomość do wszystkich podłączonych klientów WebSocket"""
+    if websocket_clients:
+        message_json = json.dumps({
+            'type': 'new_message',
+            'message': message
+        })
+        await asyncio.gather(
+            *[client.send(message_json) for client in websocket_clients],
+            return_exceptions=True
+        )
 
 
 # Handler dla nowych wiadomości
@@ -94,6 +137,8 @@ Wysłano: {message_data['timestamp']}
 Odebrano: {message_data['received_at']}
 """)
         message_history.append(message_data)
+        # Wysyłamy wiadomość do wszystkich podłączonych klientów WebSocket
+        await broadcast_message(message_data)
         # await send_to_webhook(message_data)  # Zakomentowane do czasu implementacji webhooka
     except Exception as e:
         logger.error(f"Błąd podczas przetwarzania wiadomości: {str(e)}")
@@ -207,6 +252,13 @@ async def init_client():
     logger.info("="*50)
 
 
+async def start_websocket_server():
+    """Uruchamia serwer WebSocket"""
+    server = await websockets.serve(websocket_handler, '0.0.0.0', 8765)
+    logger.info("Serwer WebSocket uruchomiony na porcie 8765")
+    return server
+
+
 async def main():
     logger.info("=== main ===")
     await init_client()
@@ -227,9 +279,15 @@ async def main():
     logger.info("Serwer uruchomiony na http://0.0.0.0:8080")
 
     try:
-        await asyncio.Event().wait()
-    except KeyboardInterrupt:
-        logger.info("Otrzymano sygnał zakończenia, zamykanie aplikacji...")
+        # Uruchomienie serwera WebSocket
+        websocket_server = await start_websocket_server()
+
+        # Uruchomienie klienta
+        logger.info("Uruchamiam nasłuchiwanie wiadomości...")
+        await client.run_until_disconnected()
+
+    except Exception as e:
+        logger.error(f"Błąd w głównej funkcji: {str(e)}")
     finally:
         await runner.cleanup()
         if client:

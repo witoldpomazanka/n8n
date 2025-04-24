@@ -1,35 +1,97 @@
 <!DOCTYPE html>
-<html>
+<html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <title>Telegram Auth</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Reader</title>
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: Arial, sans-serif;
             max-width: 800px;
-            margin: 40px auto;
-            padding: 0 20px;
-            line-height: 1.6;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
         }
-        .status {
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            background-color: #f0f0f0;
+            padding: 10px 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .session-status {
+            font-weight: 500;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+        .session-status.active {
+            background-color: #22c55e;
+        }
+        .session-status.inactive {
+            background-color: #f43f5e;
+        }
+        .websocket-status {
+            font-weight: 500;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+        .websocket-status.connected {
+            background-color: #3b82f6;
+        }
+        .websocket-status.disconnected {
+            background-color: #f59e0b;
+        }
+        .message {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .message-content {
+            font-size: 1.1em;
+            line-height: 1.4;
+        }
+        .chat-title {
+            font-weight: bold;
+            color: #333;
+        }
+        .sender-name {
+            color: #2c5282;
+        }
+        .timestamp {
+            color: #718096;
+        }
+        .auth-container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .auth-info {
+            background-color: #dbeafe;
             padding: 15px;
             margin-bottom: 20px;
             border-radius: 4px;
-        }
-        .error {
-            background-color: #fee2e2;
-            border: 1px solid #ef4444;
-            color: #991b1b;
-        }
-        .info {
-            background-color: #dbeafe;
             border: 1px solid #3b82f6;
             color: #1e40af;
         }
-        .success {
-            background-color: #dcfce7;
-            border: 1px solid #22c55e;
-            color: #166534;
+        .auth-error {
+            background-color: #fee2e2;
+            border: 1px solid #ef4444;
+            color: #991b1b;
         }
         button {
             background-color: #3b82f6;
@@ -43,10 +105,6 @@
         }
         button:hover {
             background-color: #2563eb;
-        }
-        button:disabled {
-            background-color: #9ca3af;
-            cursor: not-allowed;
         }
         input {
             padding: 8px;
@@ -62,114 +120,134 @@
             color: #4b5563;
             margin-top: 10px;
         }
-        #messages {
+        #messages-container {
             margin-top: 20px;
-            border: 1px solid #e5e7eb;
-            border-radius: 4px;
-            padding: 15px;
-        }
-        .message {
-            padding: 10px;
-            border-bottom: 1px solid #e5e7eb;
-        }
-        .message:last-child {
-            border-bottom: none;
-        }
-        .message-header {
-            color: #4b5563;
-            font-size: 0.9em;
-            margin-bottom: 5px;
-        }
-        .message-content {
-            white-space: pre-wrap;
-        }
-        .nav {
-            margin: 20px 0;
-            padding: 10px 0;
-            border-bottom: 1px solid #e5e7eb;
         }
     </style>
 </head>
 <body>
-    <div id="status" class="status info">
-        Sprawdzanie statusu sesji...
+    <div class="status-bar">
+        <div id="session-status" class="session-status inactive">Sesja: Sprawdzanie...</div>
+        <div id="websocket-status" class="websocket-status disconnected">WebSocket: Nie połączono</div>
     </div>
 
-    <div id="requestCode" class="hidden">
-        <button onclick="requestCode()">Wyślij kod weryfikacyjny</button>
+    <div id="auth-container" class="auth-container hidden">
+        <div id="auth-info" class="auth-info">
+            Wymagana autoryzacja
+        </div>
+
+        <div id="requestCode" class="hidden">
+            <button onclick="requestCode()">Wyślij kod weryfikacyjny</button>
+        </div>
+
+        <div id="enterCode" class="hidden">
+            <input type="text" id="code" placeholder="Wprowadź kod">
+            <button onclick="submitCode()">Zatwierdź</button>
+            <div id="countdown"></div>
+        </div>
     </div>
 
-    <div id="enterCode" class="hidden">
-        <input type="text" id="code" placeholder="Wprowadź kod">
-        <button onclick="submitCode()">Zatwierdź</button>
-        <div id="countdown"></div>
-    </div>
-
-    <div id="nav" class="nav hidden">
-        <button onclick="showMessages()">Pokaż wiadomości</button>
-        <button onclick="hideMessages()">Ukryj wiadomości</button>
-    </div>
-
-    <div id="messages" class="hidden">
-        <h2>Historia wiadomości</h2>
+    <div id="messages-container">
         <div id="messagesList"></div>
     </div>
 
     <script>
+        const messagesContainer = document.getElementById('messagesList');
+        const sessionStatusElement = document.getElementById('session-status');
+        const websocketStatusElement = document.getElementById('websocket-status');
+        const authContainerElement = document.getElementById('auth-container');
+        const authInfoElement = document.getElementById('auth-info');
+        
+        let ws;
         let timeoutId;
         let countdownInterval;
-        let messagesUpdateInterval;
 
-        function updateStatus(message, type) {
-            const status = document.getElementById('status');
-            status.className = 'status ' + type;
-            status.textContent = message;
-        }
-
-        function formatDate(dateStr) {
-            const date = new Date(dateStr);
-            return date.toLocaleString('pl-PL');
-        }
-
-        function updateMessages() {
-            fetch('/messages')
-                .then(response => response.json())
-                .then(data => {
-                    const messagesList = document.getElementById('messagesList');
-                    messagesList.innerHTML = '';
-                    data.messages.reverse().forEach(msg => {
-                        const messageDiv = document.createElement('div');
-                        messageDiv.className = 'message';
-                        messageDiv.innerHTML = `
-                            <div class="message-header">
-                                <strong>${msg.sender_name}</strong> w ${msg.chat_title || 'czacie prywatnym'}
-                                <br>
-                                Wysłano: ${formatDate(msg.timestamp)}
-                                <br>
-                                Odebrano: ${formatDate(msg.received_at)}
-                            </div>
-                            <div class="message-content">${msg.message}</div>
-                        `;
-                        messagesList.appendChild(messageDiv);
-                    });
-                })
-                .catch(error => {
-                    console.error('Błąd pobierania wiadomości:', error);
-                });
-        }
-
-        function showMessages() {
-            document.getElementById('messages').classList.remove('hidden');
-            updateMessages();
-            // Aktualizuj co 5 sekund
-            messagesUpdateInterval = setInterval(updateMessages, 5000);
-        }
-
-        function hideMessages() {
-            document.getElementById('messages').classList.add('hidden');
-            if (messagesUpdateInterval) {
-                clearInterval(messagesUpdateInterval);
+        function updateAuthStatus(message, isError = false) {
+            authInfoElement.textContent = message;
+            if (isError) {
+                authInfoElement.classList.add('auth-error');
+            } else {
+                authInfoElement.classList.remove('auth-error');
             }
+        }
+
+        function formatDate(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleString('pl-PL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+
+        function createMessageElement(message) {
+            const div = document.createElement('div');
+            div.className = 'message';
+            div.innerHTML = `
+                <div class="message-header">
+                    <span class="sender-name">${message.sender_name}</span>
+                    <span class="chat-title">${message.chat_title || 'Prywatny'}</span>
+                </div>
+                <div class="message-content">${message.message}</div>
+                <div class="message-header">
+                    <span class="timestamp">Wysłano: ${formatDate(message.timestamp)}</span>
+                    <span class="timestamp">Odebrano: ${formatDate(message.received_at)}</span>
+                </div>
+            `;
+            return div;
+        }
+
+        function addMessage(message) {
+            const messageElement = createMessageElement(message);
+            messagesContainer.insertBefore(messageElement, messagesContainer.firstChild);
+        }
+
+        function connectWebSocket() {
+            // Użyj aktualnego hosta i portu 8765
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+            const wsHost = window.location.hostname;
+            const wsUrl = `${wsProtocol}${wsHost}:8765`;
+            
+            console.log(`Łączenie z WebSocket: ${wsUrl}`);
+            websocketStatusElement.textContent = 'WebSocket: Łączenie...';
+            websocketStatusElement.className = 'websocket-status disconnected';
+            
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                websocketStatusElement.textContent = 'WebSocket: Nasłuchuje';
+                websocketStatusElement.className = 'websocket-status connected';
+                console.log('WebSocket połączony');
+            };
+
+            ws.onclose = (event) => {
+                websocketStatusElement.textContent = 'WebSocket: Rozłączony';
+                websocketStatusElement.className = 'websocket-status disconnected';
+                console.log(`WebSocket rozłączony, kod: ${event.code}, powód: ${event.reason}`);
+                setTimeout(connectWebSocket, 1000);
+            };
+
+            ws.onerror = (error) => {
+                console.error('Błąd WebSocket:', error);
+            };
+
+            ws.onmessage = (event) => {
+                console.log('Otrzymano wiadomość WebSocket:', event.data);
+                const data = JSON.parse(event.data);
+                if (data.type === 'history') {
+                    // Wyświetlamy historię wiadomości
+                    messagesContainer.innerHTML = '';
+                    data.messages.forEach(message => {
+                        addMessage(message);
+                    });
+                } else if (data.type === 'new_message') {
+                    // Dodajemy nową wiadomość
+                    addMessage(data.message);
+                }
+            };
         }
 
         function startCountdown(seconds) {
@@ -183,7 +261,7 @@
                 
                 if (timeLeft <= 0) {
                     clearInterval(countdownInterval);
-                    updateStatus('Przekroczono czas oczekiwania na kod. Odśwież stronę aby spróbować ponownie.', 'error');
+                    updateAuthStatus('Przekroczono czas oczekiwania na kod. Odśwież stronę aby spróbować ponownie.', true);
                     document.getElementById('enterCode').classList.add('hidden');
                 }
                 timeLeft--;
@@ -192,22 +270,22 @@
 
         function requestCode() {
             document.getElementById('requestCode').classList.add('hidden');
-            updateStatus('Wysyłanie kodu weryfikacyjnego...', 'info');
+            updateAuthStatus('Wysyłanie kodu weryfikacyjnego...');
 
             fetch('/request_code', { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        updateStatus('Kod został wysłany na Twój telefon. Wprowadź go poniżej.', 'info');
+                        updateAuthStatus('Kod został wysłany na Twój telefon. Wprowadź go poniżej.');
                         document.getElementById('enterCode').classList.remove('hidden');
                         startCountdown(300); // 5 minut
                     } else {
-                        updateStatus('Błąd: ' + data.error, 'error');
+                        updateAuthStatus('Błąd: ' + data.error, true);
                         document.getElementById('requestCode').classList.remove('hidden');
                     }
                 })
                 .catch(error => {
-                    updateStatus('Błąd połączenia: ' + error, 'error');
+                    updateAuthStatus('Błąd połączenia: ' + error, true);
                     document.getElementById('requestCode').classList.remove('hidden');
                 });
         }
@@ -215,12 +293,12 @@
         function submitCode() {
             const code = document.getElementById('code').value.trim();
             if (!code) {
-                updateStatus('Wprowadź kod weryfikacyjny', 'error');
+                updateAuthStatus('Wprowadź kod weryfikacyjny', true);
                 return;
             }
 
             document.getElementById('enterCode').classList.add('hidden');
-            updateStatus('Weryfikacja kodu...', 'info');
+            updateAuthStatus('Weryfikacja kodu...');
 
             fetch('/verify_code', {
                 method: 'POST',
@@ -233,16 +311,18 @@
             .then(data => {
                 clearInterval(countdownInterval);
                 if (data.success) {
-                    updateStatus('Zalogowano pomyślnie!', 'success');
-                    document.getElementById('nav').classList.remove('hidden');
+                    authContainerElement.classList.add('hidden');
+                    sessionStatusElement.textContent = 'Sesja: Aktywna';
+                    sessionStatusElement.className = 'session-status active';
+                    connectWebSocket();
                 } else {
-                    updateStatus('Błąd: ' + data.error, 'error');
+                    updateAuthStatus('Błąd: ' + data.error, true);
                     document.getElementById('requestCode').classList.remove('hidden');
                 }
             })
             .catch(error => {
                 clearInterval(countdownInterval);
-                updateStatus('Błąd połączenia: ' + error, 'error');
+                updateAuthStatus('Błąd połączenia: ' + error, true);
                 document.getElementById('requestCode').classList.remove('hidden');
             });
         }
@@ -252,15 +332,22 @@
             .then(response => response.json())
             .then(data => {
                 if (data.authorized) {
-                    updateStatus('Sesja aktywna, nasłuchiwanie wiadomości...', 'success');
-                    document.getElementById('nav').classList.remove('hidden');
+                    sessionStatusElement.textContent = 'Sesja: Aktywna';
+                    sessionStatusElement.className = 'session-status active';
+                    authContainerElement.classList.add('hidden');
+                    connectWebSocket();
                 } else {
-                    updateStatus('Wymagana autoryzacja', 'info');
+                    sessionStatusElement.textContent = 'Sesja: Nieaktywna';
+                    sessionStatusElement.className = 'session-status inactive';
+                    authContainerElement.classList.remove('hidden');
                     document.getElementById('requestCode').classList.remove('hidden');
                 }
             })
             .catch(error => {
-                updateStatus('Błąd sprawdzania sesji: ' + error, 'error');
+                sessionStatusElement.textContent = 'Sesja: Błąd';
+                sessionStatusElement.className = 'session-status inactive';
+                authContainerElement.classList.remove('hidden');
+                updateAuthStatus('Błąd sprawdzania sesji: ' + error, true);
                 document.getElementById('requestCode').classList.remove('hidden');
             });
     </script>

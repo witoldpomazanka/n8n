@@ -20,7 +20,8 @@ COPY templates/index.html templates/
 ENV PYTHONUNBUFFERED=1
 ENV TELEGRAM_SESSION_DIR=/data
 
-# Expose port dla serwera web
+# Expose port dla serwera web i WebSocket
 EXPOSE 8080
+EXPOSE 8765
 
 CMD ["python", "telegram_reader.py"] 

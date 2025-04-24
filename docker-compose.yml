@@ -40,6 +40,7 @@ services:
     restart: always
     ports:
       - "8080:8080"
+      - "8765:8765"
     environment:
       - TELEGRAM_API_ID=${TELEGRAM_API_ID}
       - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
