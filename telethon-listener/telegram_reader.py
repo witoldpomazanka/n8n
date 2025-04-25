@@ -506,10 +506,27 @@ async def send_to_webhook(data):
 async def broadcast_message(message):
     """Wysyła wiadomość do wszystkich podłączonych klientów WebSocket"""
     if websocket_clients:
+        # Upewnijmy się, że media są w poprawnym formacie zanim wyślemy przez WebSocket
+        if 'media' in message and message['media']:
+            try:
+                # Sprawdzamy czy media są już listą
+                if not isinstance(message['media'], list):
+                    if isinstance(message['media'], str):
+                        message['media'] = json.loads(message['media'])
+                    # Jeśli nadal nie jest listą, to konwertujemy na listę
+                    if not isinstance(message['media'], list):
+                        message['media'] = [message['media']]
+            except Exception as e:
+                logger.error(f"Błąd podczas przygotowywania mediów dla WebSocket: {str(e)}")
+                message['media'] = []
+        else:
+            message['media'] = []
+            
         message_json = {
             'type': 'new_message',
             'message': message
         }
+        
         clients_to_remove = set()
         
         for ws in list(websocket_clients):
@@ -570,21 +587,27 @@ async def handle_new_message(event):
             'media': media_list
         }
         
-        # Tworzymy kopię do wyświetlania w logach i wysyłania przez WebSocket
+        # Zapisujemy wiadomość do bazy danych
+        await save_message_to_db(message_data)
+        
+        # Tworzymy kopię do wyświetlania w logach
         log_data = message_data.copy()
         log_data['timestamp'] = log_data['timestamp'].isoformat()
         log_data['received_at'] = log_data['received_at'].isoformat()
         
-        # Usuńmy z logów dane base64, które są zbyt duże
+        # Usuńmy z logów dane base64, które są zbyt duże - tylko dla logów
         log_media = []
-        for media in log_data.get('media', []):
+        for media in message_data.get('media', []):
             media_copy = media.copy()
             if 'data' in media_copy:
                 data_size = len(media_copy['data'])
                 media_copy['data'] = f"[BASE64 DATA: {data_size // 1024} KB]"
             log_media.append(media_copy)
         
-        log_data['media'] = log_media
+        # Przygotowujemy dane do wysyłki przez WebSocket i do bufora
+        websocket_data = message_data.copy()
+        websocket_data['timestamp'] = websocket_data['timestamp'].isoformat()
+        websocket_data['received_at'] = websocket_data['received_at'].isoformat()
         
         logger.info(f"""
 Nowa wiadomość:
@@ -592,19 +615,21 @@ Od: {log_data['sender_name']} ({log_data['sender_id']})
 Czat: {log_data['chat_title']} ({log_data['chat_id']})
 Typ czatu: {log_data['chat_type']}
 Treść: {log_data['message']}
-Media: {len(log_data['media'])} załączników
+Media: {len(log_media)} załączników
 Wysłano: {log_data['timestamp']}
 Odebrano: {log_data['received_at']}
 """)
-        # Zapisujemy wiadomość do bazy danych
-        await save_message_to_db(message_data)
         
         # Dodajemy do bufora i wysyłamy przez WebSocket już z datami w formacie ISO
-        message_history.append(log_data)
-        await broadcast_message(log_data)
+        message_history.append(websocket_data)
+        await broadcast_message(websocket_data)
         
-        # Wysyłamy wiadomość do webhooka
-        await send_to_webhook(log_data)
+        # Tworzymy kopię dla webhooka z usuniętymi dużymi danymi mediów
+        webhook_data = log_data.copy()
+        webhook_data['media'] = log_media
+        
+        # Wysyłamy wiadomość do webhooka (bez dużych danych base64)
+        await send_to_webhook(webhook_data)
     except Exception as e:
         logger.error(f"Błąd podczas przetwarzania wiadomości: {str(e)}")
         logger.exception(e)  # Dodajemy pełny stacktrace błędu
@@ -817,19 +842,17 @@ async def main():
                 # Sprawdzamy czy media jest tablicą
                 if 'media' in msg and not isinstance(msg['media'], list):
                     logger.warning(f"Media nie jest tablicą w WebSocket: {type(msg['media'])}")
-                    if isinstance(msg['media'], str):
-                        try:
-                            media_data = json.loads(msg['media'])
-                            if isinstance(media_data, list):
-                                msg['media'] = media_data
-                            else:
-                                logger.warning(f"Media po parsowaniu JSON nadal nie jest tablicą: {type(media_data)}")
-                                msg['media'] = []
-                        except json.JSONDecodeError:
-                            logger.error(f"Błąd dekodowania JSON dla media: {msg['media'][:100]}...")
-                            msg['media'] = []
-                    else:
+                    try:
+                        if isinstance(msg['media'], str):
+                            msg['media'] = json.loads(msg['media'])
+                        # Jeśli nadal nie jest listą, to konwertujemy
+                        if not isinstance(msg['media'], list):
+                            msg['media'] = [msg['media']]
+                    except Exception as e:
+                        logger.error(f"Błąd podczas przetwarzania mediów dla WebSocket: {str(e)}")
                         msg['media'] = []
+                elif 'media' not in msg:
+                    msg['media'] = []
             
             # Wysyłamy historię wiadomości do klienta WebSocket
             history_data = {

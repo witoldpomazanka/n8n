@@ -331,6 +331,24 @@
                             // Dodajemy nową wiadomość (zawsze jako nową)
                             data.message.is_new = true;
                             
+                            console.log('Otrzymano nową wiadomość:', data.message);
+                            
+                            // Sprawdzamy czy media są prawidłowo sformatowane dla nowej wiadomości
+                            if (data.message.media && !Array.isArray(data.message.media)) {
+                                console.log('Konwertowanie mediów do tablicy:', data.message.media);
+                                try {
+                                    if (typeof data.message.media === 'string') {
+                                        data.message.media = JSON.parse(data.message.media);
+                                    }
+                                    if (!Array.isArray(data.message.media)) {
+                                        data.message.media = [data.message.media];
+                                    }
+                                } catch (e) {
+                                    console.error('Błąd podczas przetwarzania mediów:', e);
+                                    data.message.media = [];
+                                }
+                            }
+                            
                             // Nowa wiadomość to najpierw tworzymy element
                             const messageElement = createMessageElement(data.message);
                             // Dodajemy na koniec listy (ale przez odwróconą kolejność będzie na górze)
