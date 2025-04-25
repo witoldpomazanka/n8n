@@ -216,49 +216,92 @@
         }
 
         function createMessageElement(message) {
-            const div = document.createElement('div');
-            div.className = message.is_new ? 'message new' : 'message';
+            // Tworzenie głównego kontenera wiadomości
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
             
-            let messageHTML = `
-                <div class="message-header">
-                    <span class="sender-name">${message.sender_name}</span>
-                    <span class="chat-title">${message.chat_title || 'Prywatny'}</span>
-                </div>
-                <div class="message-content">${message.message}</div>
+            // Dodanie klasy 'new' dla nowych wiadomości
+            if (message.is_new) {
+                messageDiv.classList.add('new');
+            }
+            
+            // Nagłówek wiadomości z nadawcą i tytułem czatu
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'message-header';
+            headerDiv.innerHTML = `
+                <span class="sender-name">${message.sender_name}</span>
+                <span class="chat-title">${message.chat_title || 'Prywatny'}</span>
             `;
+            messageDiv.appendChild(headerDiv);
             
-            // Sprawdzamy czy wiadomość zawiera media
-            if (message.media && message.media.length > 0) {
-                messageHTML += '<div class="media-container">';
+            // Treść wiadomości
+            if (message.message && message.message.trim() !== '') {
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+                contentDiv.innerHTML = message.message;
+                messageDiv.appendChild(contentDiv);
+            }
+            
+            // Obsługa mediów
+            if (message.media && (Array.isArray(message.media) ? message.media.length > 0 : true)) {
+                const mediaContainer = document.createElement('div');
+                mediaContainer.className = 'media-container';
                 
-                message.media.forEach(media => {
+                // Upewniamy się, że media to tablica
+                const mediaArray = Array.isArray(message.media) ? message.media : [message.media];
+                
+                mediaArray.forEach(media => {
                     // Sprawdzamy czy media zawiera dane base64
                     if (media.data && typeof media.data === 'string' && !media.data.startsWith('[BASE64 DATA:')) {
-                        // Tworzymy URL dla obrazka
-                        const imgSrc = `data:${media.mime_type};base64,${media.data}`;
-                        messageHTML += `<img src="${imgSrc}" alt="${media.filename || 'Obraz'}" class="media-item" 
-                            title="${media.filename || 'Obraz'}" onclick="window.open('${imgSrc}', '_blank')">`;
+                        // Tworzymy element obrazu
+                        const img = document.createElement('img');
+                        img.src = `data:${media.mime_type};base64,${media.data}`;
+                        img.alt = media.filename || 'Obraz';
+                        img.className = 'media-item';
+                        img.title = media.filename || 'Obraz';
+                        
+                        // Dodajemy obsługę kliknięcia, aby otworzyć w modalu
+                        img.addEventListener('click', () => {
+                            const modal = window.open('', '_blank');
+                            modal.document.write(`
+                                <html>
+                                    <head><title>${media.filename || 'Obraz'}</title></head>
+                                    <body style="margin:0;display:flex;justify-content:center;align-items:center;background:#000;">
+                                        <img src="${img.src}" style="max-width:100%;max-height:100vh;object-fit:contain;">
+                                    </body>
+                                </html>
+                            `);
+                        });
+                        
+                        mediaContainer.appendChild(img);
                     } else if (media.data && typeof media.data === 'string' && media.data.startsWith('[BASE64 DATA:')) {
                         // Dane są zbyt duże - pokazujemy placeholder
-                        messageHTML += `<div class="media-item" style="padding: 10px; background-color: #f3f4f6; text-align: center;">
+                        const placeholderDiv = document.createElement('div');
+                        placeholderDiv.className = 'media-item';
+                        placeholderDiv.style.padding = '10px';
+                        placeholderDiv.style.backgroundColor = '#f3f4f6';
+                        placeholderDiv.style.textAlign = 'center';
+                        placeholderDiv.innerHTML = `
                             <p>${media.filename || 'Obraz'}</p>
                             <small>${media.data}</small>
-                        </div>`;
+                        `;
+                        mediaContainer.appendChild(placeholderDiv);
                     }
                 });
                 
-                messageHTML += '</div>';
+                messageDiv.appendChild(mediaContainer);
             }
             
-            messageHTML += `
-                <div class="message-header">
-                    <span class="timestamp">Wysłano: ${formatDate(message.timestamp)}</span>
-                    <span class="timestamp">Odebrano: ${formatDate(message.received_at)}</span>
-                </div>
+            // Dodajemy znaczniki czasu
+            const timestampDiv = document.createElement('div');
+            timestampDiv.className = 'message-header';
+            timestampDiv.innerHTML = `
+                <span class="timestamp">Wysłano: ${formatDate(message.timestamp)}</span>
+                <span class="timestamp">Odebrano: ${formatDate(message.received_at)}</span>
             `;
+            messageDiv.appendChild(timestampDiv);
             
-            div.innerHTML = messageHTML;
-            return div;
+            return messageDiv;
         }
 
         function addMessage(message) {
