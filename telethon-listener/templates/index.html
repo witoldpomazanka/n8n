@@ -67,6 +67,23 @@
             font-size: 1.1em;
             line-height: 1.4;
         }
+        .media-container {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .media-item {
+            max-width: 300px;
+            max-height: 300px;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        .media-item:hover {
+            transform: scale(1.05);
+        }
         .chat-title {
             font-weight: bold;
             color: #333;
@@ -201,17 +218,46 @@
         function createMessageElement(message) {
             const div = document.createElement('div');
             div.className = message.is_new ? 'message new' : 'message';
-            div.innerHTML = `
+            
+            let messageHTML = `
                 <div class="message-header">
                     <span class="sender-name">${message.sender_name}</span>
                     <span class="chat-title">${message.chat_title || 'Prywatny'}</span>
                 </div>
                 <div class="message-content">${message.message}</div>
+            `;
+            
+            // Sprawdzamy czy wiadomość zawiera media
+            if (message.media && message.media.length > 0) {
+                messageHTML += '<div class="media-container">';
+                
+                message.media.forEach(media => {
+                    // Sprawdzamy czy media zawiera dane base64
+                    if (media.data && typeof media.data === 'string' && !media.data.startsWith('[BASE64 DATA:')) {
+                        // Tworzymy URL dla obrazka
+                        const imgSrc = `data:${media.mime_type};base64,${media.data}`;
+                        messageHTML += `<img src="${imgSrc}" alt="${media.filename || 'Obraz'}" class="media-item" 
+                            title="${media.filename || 'Obraz'}" onclick="window.open('${imgSrc}', '_blank')">`;
+                    } else if (media.data && typeof media.data === 'string' && media.data.startsWith('[BASE64 DATA:')) {
+                        // Dane są zbyt duże - pokazujemy placeholder
+                        messageHTML += `<div class="media-item" style="padding: 10px; background-color: #f3f4f6; text-align: center;">
+                            <p>${media.filename || 'Obraz'}</p>
+                            <small>${media.data}</small>
+                        </div>`;
+                    }
+                });
+                
+                messageHTML += '</div>';
+            }
+            
+            messageHTML += `
                 <div class="message-header">
                     <span class="timestamp">Wysłano: ${formatDate(message.timestamp)}</span>
                     <span class="timestamp">Odebrano: ${formatDate(message.received_at)}</span>
                 </div>
             `;
+            
+            div.innerHTML = messageHTML;
             return div;
         }
 

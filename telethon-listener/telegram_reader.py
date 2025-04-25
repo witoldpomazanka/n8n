@@ -20,6 +20,8 @@ import asyncpg
 import datetime as dt
 from datetime import datetime
 import dateutil.parser
+import base64
+from telethon.tl.types import DocumentAttributeImageSize, DocumentAttributeFilename
 
 # Konfiguracja logowania
 logger = logging.getLogger('telegram_reader')
@@ -48,6 +50,9 @@ PG_PASSWORD = os.getenv('POSTGRES_PASSWORD')
 PG_DB = os.getenv('POSTGRES_DB')
 PG_HOST = os.getenv('POSTGRES_HOST', 'postgres')
 PG_PORT = os.getenv('POSTGRES_PORT', '5432')
+
+# Tworzymy URL połączenia do bazy danych
+DATABASE_URL = f"postgresql://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG_DB}"
 
 # Nazwa tabeli dla wiadomości Telegram (bez konfliktu z tabelami n8n)
 TELEGRAM_MESSAGES_TABLE = 'telegram_messages_history'
@@ -93,33 +98,17 @@ logger.info("=" * 50)
 
 
 async def init_database():
-    """Inicjalizuje połączenie z bazą danych i tworzy tabelę jeśli nie istnieje"""
+    """Inicjalizuje połączenie z bazą danych i tworzy wymagane tabele"""
     global db_pool
-    
-    logger.info("=== init_database ===")
     try:
-        # Tworzenie puli połączeń
-        db_pool = await asyncpg.create_pool(
-            user=PG_USER,
-            password=PG_PASSWORD,
-            database=PG_DB,
-            host=PG_HOST,
-            port=PG_PORT
-        )
+        logger.info("Inicjalizacja połączenia z bazą danych...")
+        # Tworzymy pulę połączeń do bazy danych
+        db_pool = await asyncpg.create_pool(dsn=DATABASE_URL)
         
-        logger.info("Połączenie z bazą danych zostało nawiązane")
-        
-        # Sprawdzenie czy tabela istnieje, jeśli nie to ją tworzymy
         async with db_pool.acquire() as conn:
-            table_exists = await conn.fetchval(
-                "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = $1)",
-                TELEGRAM_MESSAGES_TABLE
-            )
-            
-            if not table_exists:
-                logger.info(f"Tworzenie tabeli {TELEGRAM_MESSAGES_TABLE}...")
-                await conn.execute(f'''
-                CREATE TABLE {TELEGRAM_MESSAGES_TABLE} (
+            # Tworzymy tabelę wiadomości jeśli nie istnieje
+            await conn.execute(f'''
+                CREATE TABLE IF NOT EXISTS {TELEGRAM_MESSAGES_TABLE} (
                     id SERIAL PRIMARY KEY,
                     message TEXT,
                     chat_id TEXT,
@@ -127,31 +116,112 @@ async def init_database():
                     chat_type TEXT,
                     sender_id TEXT,
                     sender_name TEXT,
-                    timestamp TIMESTAMPTZ,
-                    received_at TIMESTAMPTZ,
-                    is_new BOOLEAN DEFAULT TRUE
+                    timestamp TIMESTAMP WITH TIME ZONE,
+                    received_at TIMESTAMP WITH TIME ZONE,
+                    is_new BOOLEAN DEFAULT TRUE,
+                    media JSONB
                 )
-                ''')
-                logger.info("Tabela została utworzona pomyślnie")
-            else:
-                logger.info(f"Tabela {TELEGRAM_MESSAGES_TABLE} już istnieje")
-                
-                # Sprawdzamy czy kolumna chat_type istnieje
-                column_exists = await conn.fetchval(
-                    "SELECT EXISTS (SELECT FROM information_schema.columns WHERE table_name = $1 AND column_name = 'chat_type')",
-                    TELEGRAM_MESSAGES_TABLE
+            ''')
+            
+            # Sprawdzenie czy kolumna 'media' istnieje, jeśli nie - dodaj ją
+            try:
+                columns = await conn.fetch(
+                    f"SELECT column_name FROM information_schema.columns WHERE table_name = '{TELEGRAM_MESSAGES_TABLE}'"
                 )
+                column_names = [col['column_name'] for col in columns]
                 
-                # Jeśli nie istnieje, dodajemy ją
-                if not column_exists:
-                    logger.info(f"Dodawanie kolumny chat_type do tabeli {TELEGRAM_MESSAGES_TABLE}...")
-                    await conn.execute(f"ALTER TABLE {TELEGRAM_MESSAGES_TABLE} ADD COLUMN chat_type TEXT")
-                    logger.info("Kolumna chat_type została dodana pomyślnie")
+                if 'media' not in column_names:
+                    logger.info("Dodawanie kolumny 'media' do tabeli wiadomości...")
+                    await conn.execute(
+                        f"ALTER TABLE {TELEGRAM_MESSAGES_TABLE} ADD COLUMN media JSONB"
+                    )
+            except Exception as e:
+                logger.error(f"Błąd podczas sprawdzania/dodawania kolumny 'media': {str(e)}")
+        
+        logger.info("✓ Inicjalizacja bazy danych zakończona pomyślnie")
         
         return True
     except Exception as e:
         logger.error(f"Błąd podczas inicjalizacji bazy danych: {str(e)}")
         return False
+
+
+async def get_media_from_message(message):
+    """Pobiera media z wiadomości Telegram i konwertuje je do formatu odpowiedniego do zapisu w DB"""
+    logger.info("Pobieranie mediów z wiadomości...")
+    
+    if not message.media:
+        logger.info("Wiadomość nie zawiera mediów")
+        return []
+    
+    media_list = []
+    
+    try:
+        # Obsługa różnych typów mediów
+        if hasattr(message.media, 'photo'):
+            logger.info("Wykryto zdjęcie")
+            # Pobieramy największą wersję zdjęcia
+            photo = message.media.photo
+            data = await message.download_media(bytes)
+            
+            if data:
+                media_list.append({
+                    'type': 'photo',
+                    'mime_type': 'image/jpeg',
+                    'data': base64.b64encode(data).decode('utf-8'),
+                    'size': len(data),
+                    'filename': f"photo_{photo.id}.jpg"
+                })
+                logger.info(f"Pobrano zdjęcie, rozmiar: {len(data)} bajtów")
+            else:
+                logger.warning("Nie udało się pobrać zdjęcia")
+                
+        elif hasattr(message.media, 'document'):
+            doc = message.media.document
+            
+            # Sprawdzamy czy dokument to zdjęcie
+            is_image = False
+            for attr in doc.attributes:
+                if isinstance(attr, DocumentAttributeImageSize):
+                    is_image = True
+                    break
+                
+            # Jeśli to zdjęcie lub ma rozszerzenie obrazu, pobieramy
+            mime_type = doc.mime_type or 'application/octet-stream'
+            filename = None
+            
+            for attr in doc.attributes:
+                if isinstance(attr, DocumentAttributeFilename):
+                    filename = attr.file_name
+                    break
+            
+            if is_image or (mime_type and mime_type.startswith('image/')):
+                logger.info(f"Wykryto dokument będący obrazem: {filename}")
+                data = await message.download_media(bytes)
+                
+                if data:
+                    media_list.append({
+                        'type': 'document',
+                        'mime_type': mime_type,
+                        'data': base64.b64encode(data).decode('utf-8'),
+                        'size': len(data),
+                        'filename': filename or f"document_{doc.id}.{mime_type.split('/')[-1]}"
+                    })
+                    logger.info(f"Pobrano dokument, rozmiar: {len(data)} bajtów")
+                else:
+                    logger.warning("Nie udało się pobrać dokumentu")
+            else:
+                logger.info(f"Pominięto dokument niebędący obrazem: {mime_type}, {filename}")
+        
+        else:
+            logger.info(f"Nieobsługiwany typ mediów: {type(message.media).__name__}")
+    
+    except Exception as e:
+        logger.error(f"Błąd podczas pobierania mediów: {str(e)}")
+        logger.exception(e)
+    
+    logger.info(f"Pobrano {len(media_list)} mediów")
+    return media_list
 
 
 async def save_message_to_db(message_data):
@@ -166,24 +236,74 @@ async def save_message_to_db(message_data):
         
         if isinstance(received_at, str):
             received_at = dateutil.parser.parse(received_at)
+        
+        # Serializacja mediów do JSON jeśli istnieją
+        media_json = None
+        if 'media' in message_data and message_data['media']:
+            try:
+                # Sprawdzamy czy media to już string JSON
+                if isinstance(message_data['media'], str):
+                    # Już jest w formie JSON, używamy bezpośrednio
+                    media_json = message_data['media']
+                else:
+                    # Konwertujemy obiekty do JSON
+                    media_json = json.dumps(message_data['media'])
+                logger.info(f"Media zostały zserializowane do JSON")
+            except Exception as e:
+                logger.error(f"Błąd podczas serializacji mediów do JSON: {str(e)}")
+                logger.exception(e)
             
         async with db_pool.acquire() as conn:
-            await conn.execute(
-                f'''
-                INSERT INTO {TELEGRAM_MESSAGES_TABLE} 
-                (message, chat_id, chat_title, chat_type, sender_id, sender_name, timestamp, received_at, is_new)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                ''',
-                message_data['message'],
-                message_data['chat_id'],
-                message_data['chat_title'],
-                message_data.get('chat_type', 'unknown'),  # Obsługa wiadomości bez określonego typu czatu
-                message_data['sender_id'],
-                message_data['sender_name'],
-                timestamp,
-                received_at,
-                message_data.get('is_new', True)  # Domyślnie nowa wiadomość
-            )
+            # Sprawdzamy czy kolumna 'media' istnieje
+            try:
+                columns = await conn.fetch(
+                    f"SELECT column_name FROM information_schema.columns WHERE table_name = '{TELEGRAM_MESSAGES_TABLE}'"
+                )
+                column_names = [col['column_name'] for col in columns]
+                
+                if 'media' not in column_names:
+                    logger.info("Dodawanie kolumny 'media' do tabeli wiadomości...")
+                    await conn.execute(
+                        f"ALTER TABLE {TELEGRAM_MESSAGES_TABLE} ADD COLUMN media JSONB"
+                    )
+            except Exception as e:
+                logger.error(f"Błąd podczas sprawdzania kolumny 'media': {str(e)}")
+            
+            if media_json:
+                await conn.execute(
+                    f'''
+                    INSERT INTO {TELEGRAM_MESSAGES_TABLE} 
+                    (message, chat_id, chat_title, chat_type, sender_id, sender_name, timestamp, received_at, is_new, media)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                    ''',
+                    message_data['message'],
+                    message_data['chat_id'],
+                    message_data['chat_title'],
+                    message_data.get('chat_type', 'unknown'),
+                    message_data['sender_id'],
+                    message_data['sender_name'],
+                    timestamp,
+                    received_at,
+                    message_data.get('is_new', True),
+                    media_json
+                )
+            else:
+                await conn.execute(
+                    f'''
+                    INSERT INTO {TELEGRAM_MESSAGES_TABLE} 
+                    (message, chat_id, chat_title, chat_type, sender_id, sender_name, timestamp, received_at, is_new)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                    ''',
+                    message_data['message'],
+                    message_data['chat_id'],
+                    message_data['chat_title'],
+                    message_data.get('chat_type', 'unknown'),
+                    message_data['sender_id'],
+                    message_data['sender_name'],
+                    timestamp,
+                    received_at,
+                    message_data.get('is_new', True)
+                )
             logger.info(f"Wiadomość została zapisana do bazy danych")
     except Exception as e:
         logger.error(f"Błąd podczas zapisywania wiadomości do bazy danych: {str(e)}")
@@ -218,6 +338,23 @@ async def load_messages_from_db():
                 # Formatujemy timestampy do ISO
                 message['timestamp'] = message['timestamp'].isoformat()
                 message['received_at'] = message['received_at'].isoformat()
+                
+                # Przetwarzamy media z JSONB do obiektu Python
+                if 'media' in message and message['media']:
+                    try:
+                        # Jeśli media to już string JSON, konwertujemy go do obiektu Python
+                        if isinstance(message['media'], str):
+                            message['media'] = json.loads(message['media'])
+                        # Typ JSONB z PostgreSQL zostanie już zdeserialiozwany przez asyncpg
+                        # Upewniamy się tylko, że media to lista
+                        if not isinstance(message['media'], list):
+                            message['media'] = [message['media']]
+                    except Exception as e:
+                        logger.error(f"Błąd podczas przetwarzania mediów dla wiadomości {message.get('id')}: {str(e)}")
+                        message['media'] = []
+                else:
+                    message['media'] = []
+                
                 messages.append(message)
             
             # Czyszczenie bufora i dodawanie wiadomości
@@ -229,6 +366,7 @@ async def load_messages_from_db():
             return messages
     except Exception as e:
         logger.error(f"Błąd podczas ładowania wiadomości z bazy danych: {str(e)}")
+        logger.exception(e)
         return []
 
 
@@ -286,8 +424,7 @@ async def load_historical_messages():
                 if latest_timestamp and message.date <= latest_timestamp:
                     continue
                 
-                if message.text:  # Tylko wiadomości tekstowe
-                    messages_to_process.append(message)
+                messages_to_process.append(message)
             
             # Przetwarzamy wiadomości dla danego dialogu
             for message in messages_to_process:
@@ -300,8 +437,11 @@ async def load_historical_messages():
                     
                     message_timezone = message.date.tzinfo
                     
+                    # Pobieramy media z wiadomości
+                    media_list = await get_media_from_message(message)
+                    
                     message_data = {
-                        'message': message.text,
+                        'message': message.text or '',
                         'chat_id': str(chat.id),
                         'chat_title': getattr(chat, 'title', None) or getattr(chat, 'username', None) or 'Prywatny',
                         'chat_type': chat_type,
@@ -309,7 +449,8 @@ async def load_historical_messages():
                         'sender_name': sender_name or 'Nieznany',
                         'timestamp': message.date,  # Używamy obiektu datetime zamiast stringa
                         'received_at': datetime.now(message_timezone),  # Używamy obiektu datetime zamiast stringa
-                        'is_new': False  # Historyczne wiadomości nie są nowe
+                        'is_new': False,  # Historyczne wiadomości nie są nowe
+                        'media': media_list
                     }
                     
                     # Zapisujemy wiadomość do bazy danych
@@ -413,6 +554,9 @@ async def handle_new_message(event):
         # Pobieramy timezone z daty wysłania
         message_timezone = event.date.tzinfo
         
+        # Pobieramy media z wiadomości
+        media_list = await get_media_from_message(event)
+        
         message_data = {
             'message': event.raw_text,
             'chat_id': str(chat.id),
@@ -422,7 +566,8 @@ async def handle_new_message(event):
             'sender_name': sender_name or 'Nieznany',
             'timestamp': event.date,  # Używamy obiektu datetime zamiast stringa
             'received_at': datetime.now(message_timezone),  # Używamy obiektu datetime zamiast stringa
-            'is_new': True
+            'is_new': True,
+            'media': media_list
         }
         
         # Tworzymy kopię do wyświetlania w logach i wysyłania przez WebSocket
@@ -430,12 +575,24 @@ async def handle_new_message(event):
         log_data['timestamp'] = log_data['timestamp'].isoformat()
         log_data['received_at'] = log_data['received_at'].isoformat()
         
+        # Usuńmy z logów dane base64, które są zbyt duże
+        log_media = []
+        for media in log_data.get('media', []):
+            media_copy = media.copy()
+            if 'data' in media_copy:
+                data_size = len(media_copy['data'])
+                media_copy['data'] = f"[BASE64 DATA: {data_size // 1024} KB]"
+            log_media.append(media_copy)
+        
+        log_data['media'] = log_media
+        
         logger.info(f"""
 Nowa wiadomość:
 Od: {log_data['sender_name']} ({log_data['sender_id']})
 Czat: {log_data['chat_title']} ({log_data['chat_id']})
 Typ czatu: {log_data['chat_type']}
 Treść: {log_data['message']}
+Media: {len(log_data['media'])} załączników
 Wysłano: {log_data['timestamp']}
 Odebrano: {log_data['received_at']}
 """)
@@ -478,11 +635,28 @@ async def get_messages(request):
             # Formatujemy timestampy do ISO
             message['timestamp'] = message['timestamp'].isoformat()
             message['received_at'] = message['received_at'].isoformat()
+            
+            # Przetwarzamy media z JSONB do obiektu Python
+            if 'media' in message and message['media']:
+                try:
+                    # Jeśli media to już string JSON, konwertujemy go do obiektu Python
+                    if isinstance(message['media'], str):
+                        message['media'] = json.loads(message['media'])
+                    # Upewniamy się, że media to lista
+                    if not isinstance(message['media'], list):
+                        message['media'] = [message['media']]
+                except Exception as e:
+                    logger.error(f"Błąd podczas przetwarzania mediów dla wiadomości {message.get('id')}: {str(e)}")
+                    message['media'] = []
+            else:
+                message['media'] = []
+                
             messages.append(message)
         
         return web.json_response({'messages': messages})
     except Exception as e:
         logger.error(f"Błąd podczas pobierania wiadomości: {str(e)}")
+        logger.exception(e)
         return web.json_response({'messages': list(message_history)})
 
 
@@ -638,11 +812,32 @@ async def main():
             # Pobierz wszystkie wiadomości z bazy danych
             messages = await load_messages_from_db()
             
+            # Dodatkowe sprawdzenie formatu danych przed wysłaniem
+            for msg in messages:
+                # Sprawdzamy czy media jest tablicą
+                if 'media' in msg and not isinstance(msg['media'], list):
+                    logger.warning(f"Media nie jest tablicą w WebSocket: {type(msg['media'])}")
+                    if isinstance(msg['media'], str):
+                        try:
+                            media_data = json.loads(msg['media'])
+                            if isinstance(media_data, list):
+                                msg['media'] = media_data
+                            else:
+                                logger.warning(f"Media po parsowaniu JSON nadal nie jest tablicą: {type(media_data)}")
+                                msg['media'] = []
+                        except json.JSONDecodeError:
+                            logger.error(f"Błąd dekodowania JSON dla media: {msg['media'][:100]}...")
+                            msg['media'] = []
+                    else:
+                        msg['media'] = []
+            
             # Wysyłamy historię wiadomości do klienta WebSocket
-            await send_websocket_json(ws, {
+            history_data = {
                 'type': 'history',
                 'messages': messages
-            })
+            }
+            logger.info(f"Wysyłanie historii wiadomości do WebSocket ({len(messages)} wiadomości)")
+            await send_websocket_json(ws, history_data)
             
             # Nasłuchujemy na wiadomości od klienta
             async for msg in ws:
