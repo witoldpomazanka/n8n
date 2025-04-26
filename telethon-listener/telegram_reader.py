@@ -89,13 +89,6 @@ async def send_websocket_json(ws, data):
         return False
 
 logger.info("=== START APLIKACJI ===")
-logger.info(f"API_ID: {API_ID}")
-logger.info(f"API_HASH: {'*' * len(API_HASH) if API_HASH else 'None'}")
-logger.info(f"PHONE: {PHONE}")
-logger.info(f"N8N_WEBHOOK_URL: {N8N_WEBHOOK_URL}")
-logger.info(f"PG_HOST: {PG_HOST}")
-logger.info(f"PG_DB: {PG_DB}")
-logger.info("=" * 50)
 
 grouped_messages_buffer = {}
 grouped_messages_timers = {}
@@ -152,10 +145,7 @@ async def init_database():
 
 async def get_media_from_message(message):
     """Pobiera media z wiadomości Telegram i konwertuje je do formatu odpowiedniego do zapisu w DB"""
-    logger.info("Pobieranie mediów z wiadomości...")
-    
     if not message.media:
-        logger.info("Wiadomość nie zawiera mediów")
         return []
     
     media_list = []
@@ -163,7 +153,6 @@ async def get_media_from_message(message):
     try:
         # Obsługa różnych typów mediów
         if hasattr(message.media, 'photo'):
-            logger.info("Wykryto zdjęcie")
             # Pobieramy największą wersję zdjęcia
             photo = message.media.photo
             data = await message.download_media(bytes)
@@ -176,7 +165,6 @@ async def get_media_from_message(message):
                     'size': len(data),
                     'filename': f"photo_{photo.id}.jpg"
                 })
-                logger.info(f"Pobrano zdjęcie, rozmiar: {len(data)} bajtów")
             else:
                 logger.warning("Nie udało się pobrać zdjęcia")
                 
@@ -200,7 +188,6 @@ async def get_media_from_message(message):
                     break
             
             if is_image or (mime_type and mime_type.startswith('image/')):
-                logger.info(f"Wykryto dokument będący obrazem: {filename}")
                 data = await message.download_media(bytes)
                 
                 if data:
@@ -211,20 +198,13 @@ async def get_media_from_message(message):
                         'size': len(data),
                         'filename': filename or f"document_{doc.id}.{mime_type.split('/')[-1]}"
                     })
-                    logger.info(f"Pobrano dokument, rozmiar: {len(data)} bajtów")
                 else:
                     logger.warning("Nie udało się pobrać dokumentu")
-            else:
-                logger.info(f"Pominięto dokument niebędący obrazem: {mime_type}, {filename}")
-        
-        else:
-            logger.info(f"Nieobsługiwany typ mediów: {type(message.media).__name__}")
     
     except Exception as e:
         logger.error(f"Błąd podczas pobierania mediów: {str(e)}")
         logger.exception(e)
     
-    logger.info(f"Pobrano {len(media_list)} mediów")
     return media_list
 
 
@@ -252,7 +232,6 @@ async def save_message_to_db(message_data):
                 else:
                     # Konwertujemy obiekty do JSON
                     media_json = json.dumps(message_data['media'])
-                logger.info(f"Media zostały zserializowane do JSON")
             except Exception as e:
                 logger.error(f"Błąd podczas serializacji mediów do JSON: {str(e)}")
                 logger.exception(e)
@@ -308,7 +287,6 @@ async def save_message_to_db(message_data):
                     received_at,
                     message_data.get('is_new', True)
                 )
-            logger.info(f"Wiadomość została zapisana do bazy danych")
     except Exception as e:
         logger.error(f"Błąd podczas zapisywania wiadomości do bazy danych: {str(e)}")
         logger.exception(e)
@@ -366,7 +344,6 @@ async def load_messages_from_db():
             for msg in messages:  # Już są posortowane od DESC w zapytaniu SQL
                 message_history.append(msg)
             
-            logger.info(f"Załadowano {len(messages)} wiadomości z bazy danych")
             return messages
     except Exception as e:
         logger.error(f"Błąd podczas ładowania wiadomości z bazy danych: {str(e)}")
@@ -381,7 +358,6 @@ async def mark_all_messages_as_old():
             await conn.execute(
                 f"UPDATE {TELEGRAM_MESSAGES_TABLE} SET is_new = FALSE"
             )
-            logger.info("Wszystkie wiadomości zostały oznaczone jako stare")
     except Exception as e:
         logger.error(f"Błąd podczas oznaczania wiadomości jako stare: {str(e)}")
 
@@ -392,13 +368,8 @@ async def load_historical_messages():
     global client
     try:
         latest_timestamp = await get_latest_message_timestamp()
-        if latest_timestamp:
-            logger.info(f"Ostatnia wiadomość z datą: {latest_timestamp}")
-        else:
-            logger.info("Brak wiadomości w bazie danych, pobieranie całej historii")
         added_messages = 0
         async for dialog in client.iter_dialogs():
-            logger.info(f"Pobieranie wiadomości z dialogu: {dialog.name} (id: {dialog.id})")
             messages_to_process = []
             async for message in client.iter_messages(dialog.id, limit=100):
                 if latest_timestamp and message.date <= latest_timestamp:
@@ -480,22 +451,14 @@ async def load_historical_messages():
 
 
 async def send_to_webhook(data):
-    logger.info("=== send_to_webhook ===")
     if not N8N_WEBHOOK_URL:
         logger.warning("Brak skonfigurowanego URL dla webhooka (N8N_WEBHOOK_URL)")
         return
     
-    logger.info(f"Wysyłanie wiadomości do webhooka: {N8N_WEBHOOK_URL}")
-    logger.info(f"Dane wiadomości: {json.dumps(data, ensure_ascii=False)}")
-    
     async with aiohttp.ClientSession() as session:
         try:
             async with session.post(N8N_WEBHOOK_URL, json=data) as response:
-                if response.status == 200:
-                    logger.info(f"Wiadomość wysłana do webhooka, status: {response.status}")
-                    response_text = await response.text()
-                    logger.info(f"Odpowiedź z webhooka: {response_text}")
-                else:
+                if response.status != 200:
                     logger.error(f"Błąd podczas wysyłania do webhooka, status: {response.status}")
                     response_text = await response.text()
                     logger.error(f"Odpowiedź z webhooka: {response_text}")
@@ -513,7 +476,6 @@ async def broadcast_message(message):
         # Upewnijmy się, że media są w poprawnym formacie zanim wyślemy przez WebSocket
         if 'media' in message and message['media']:
             try:
-                logger.info(f"Przetwarzanie mediów przed wysłaniem: {message['media']}")
                 # Sprawdzamy czy media są już listą
                 if not isinstance(message['media'], list):
                     if isinstance(message['media'], str):
@@ -523,7 +485,6 @@ async def broadcast_message(message):
                         message['media'] = [message['media']]
                 # Upewniamy się, że wszystkie elementy w liście są prawidłowymi obiektami mediów
                 message['media'] = [m for m in message['media'] if isinstance(m, dict) and 'data' in m]
-                logger.info(f"Media po przetworzeniu: {len(message['media'])} elementów")
             except Exception as e:
                 logger.error(f"Błąd podczas przygotowywania mediów dla WebSocket: {str(e)}")
                 message['media'] = []
@@ -549,18 +510,11 @@ async def broadcast_message(message):
         # Usuwamy zepsute połączenia
         for ws in clients_to_remove:
             websocket_clients.discard(ws)
-        
-        logger.info(f"Wiadomość wysłana do {len(websocket_clients)} klientów WebSocket")
 
 
 # Handler dla nowych wiadomości
 async def handle_new_message(event):
     logger.info("=== handle_new_message ===")
-    logger.info(f"ID czatu: {getattr(event, 'chat_id', None)} | grouped_id: {getattr(event, 'grouped_id', None)} | ID wiadomości: {getattr(event, 'id', None)}")
-    logger.info(f"Typ eventu: {type(event)} | Czy media: {hasattr(event, 'media') and event.media is not None}")
-    if hasattr(event, 'media') and event.media:
-        logger.info(f"Typ media: {type(event.media)}")
-    logger.info(f"Treść: {getattr(event, 'raw_text', '')}")
     try:
         chat = await event.get_chat()
         sender = await event.get_sender()
@@ -654,17 +608,6 @@ async def handle_new_message(event):
         websocket_data['timestamp'] = websocket_data['timestamp'].isoformat()
         websocket_data['received_at'] = websocket_data['received_at'].isoformat()
         
-        logger.info(f"""
-Nowa wiadomość:
-Od: {log_data['sender_name']} ({log_data['sender_id']})
-Czat: {log_data['chat_title']} ({log_data['chat_id']})
-Typ czatu: {log_data['chat_type']}
-Treść: {log_data['message']}
-Media: {len(log_media)} załączników
-Wysłano: {log_data['timestamp']}
-Odebrano: {log_data['received_at']}
-""")
-        
         # Dodajemy do bufora i wysyłamy przez WebSocket już z datami w formacie ISO
         message_history.append(websocket_data)
         await broadcast_message(websocket_data)
@@ -708,7 +651,6 @@ async def save_grouped_message(key):
 
 
 async def handle_messages(request):
-    logger.info("=== handle_messages ===")
     global client
     if not client or not client.is_connected():
         return web.Response(text="Klient nie jest połączony")
@@ -716,8 +658,6 @@ async def handle_messages(request):
 
 
 async def get_messages(request):
-    logger.info("=== get_messages ===")
-    
     try:
         # Pobieramy wiadomości z bazy danych
         async with db_pool.acquire() as conn:
@@ -758,19 +698,16 @@ async def get_messages(request):
 
 
 async def index(request):
-    logger.info("=== index ===")
     file_path = pathlib.Path(__file__).parent / 'templates' / 'index.html'
     return web.FileResponse(path=file_path)
 
 
 async def check_session(request):
-    logger.info("=== check_session ===")
     global client
     if not client or not client.is_connected():
         await init_client()
     try:
         if not client.is_connected():
-            logger.info("Próba połączenia z Telegramem...")
             await client.connect()
 
         is_authorized = await client.is_user_authorized()
@@ -783,7 +720,6 @@ async def check_session(request):
 
 
 async def request_code(request):
-    logger.info("=== request_code ===")
     global phone_code_hash
     try:
         if not client.is_connected():
@@ -796,7 +732,6 @@ async def request_code(request):
 
 
 async def verify_code(request):
-    logger.info("=== verify_code ===")
     global phone_code_hash
     try:
         data = await request.json()
@@ -815,21 +750,12 @@ async def init_client():
     session_dir = os.getenv('TELEGRAM_SESSION_DIR', '/data')
     session_file = os.path.join(session_dir, 'telegram_reader_session.session')
     
-    logger.info("="*50)
-    logger.info("Inicjalizacja klienta Telegram")
-    logger.info(f"Katalog sesji: {session_dir}")
     if not os.path.exists(session_dir):
         logger.warning(f"Katalog sesji nie istnieje, tworzę: {session_dir}")
         os.makedirs(session_dir)
     
-    if os.path.exists(session_file):
-        size = os.path.getsize(session_file)
-        logger.info(f"Znaleziono plik sesji (rozmiar: {size} bajtów)")
-        logger.info(f"Ścieżka do pliku sesji: {session_file}")
-        logger.info("Próba użycia istniejącej sesji...")
-    else:
+    if not os.path.exists(session_file):
         logger.warning("Nie znaleziono pliku sesji - wymagana będzie autoryzacja")
-        logger.info(f"Nowa sesja zostanie utworzona w: {session_file}")
     
     client = TelegramClient(session_file, API_ID, API_HASH)
     
@@ -851,7 +777,6 @@ async def init_client():
 
 async def reload_messages(request):
     """Endpunkt do ręcznego ponownego załadowania wiadomości"""
-    logger.info("=== reload_messages ===")
     global client
     
     if not client or not client.is_connected():
@@ -875,7 +800,7 @@ async def main():
     """Główna funkcja programu"""
     global client
     
-    logger.info("=== main ===")
+    logger.info("=== Uruchamianie aplikacji ===")
     
     # Inicjalizacja klienta Telegram
     client = await init_client()
@@ -903,7 +828,6 @@ async def main():
         await ws.prepare(request)
         
         websocket_clients.add(ws)
-        logger.info(f"Nowe połączenie WebSocket, aktualnie połączonych: {len(websocket_clients)}")
         
         try:
             # Pobierz wszystkie wiadomości z bazy danych
@@ -931,21 +855,17 @@ async def main():
                 'type': 'history',
                 'messages': messages
             }
-            logger.info(f"Wysyłanie historii wiadomości do WebSocket ({len(messages)} wiadomości)")
             await send_websocket_json(ws, history_data)
             
             # Nasłuchujemy na wiadomości od klienta
             async for msg in ws:
-                if msg.type == web.WSMsgType.TEXT:
-                    logger.info(f"Otrzymano wiadomość od klienta WebSocket: {msg.data}")
-                elif msg.type == web.WSMsgType.ERROR:
+                if msg.type == web.WSMsgType.ERROR:
                     logger.error(f"Błąd WebSocket: {ws.exception()}")
         except Exception as e:
             logger.error(f"Błąd w obsłudze WebSocket: {str(e)}")
             logger.exception(e)
         finally:
             websocket_clients.discard(ws)
-            logger.info(f"Połączenie WebSocket zakończone, pozostałych: {len(websocket_clients)}")
             
         return ws
     
@@ -958,11 +878,8 @@ async def main():
     site = web.TCPSite(runner, '0.0.0.0', 8080)
     await site.start()
     logger.info("Serwer HTTP uruchomiony na http://0.0.0.0:8080")
-    logger.info("WebSocket dostępny na ws://0.0.0.0:8080/ws")
     
     # Uruchomienie klienta
-    logger.info("Uruchamiam nasłuchiwanie wiadomości...")
-    
     try:
         await client.run_until_disconnected()
     except Exception as e:
