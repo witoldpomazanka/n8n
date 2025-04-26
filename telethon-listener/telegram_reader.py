@@ -22,6 +22,7 @@ from datetime import datetime
 import dateutil.parser
 import base64
 from telethon.tl.types import DocumentAttributeImageSize, DocumentAttributeFilename
+import time
 
 # Konfiguracja logowania
 logger = logging.getLogger('telegram_reader')
@@ -96,6 +97,9 @@ logger.info(f"PG_HOST: {PG_HOST}")
 logger.info(f"PG_DB: {PG_DB}")
 logger.info("=" * 50)
 
+grouped_messages_buffer = {}
+grouped_messages_timers = {}
+GROUPED_MESSAGE_TIMEOUT = 1.0  # sekundy
 
 async def init_database():
     """Inicjalizuje połączenie z bazą danych i tworzy wymagane tabele"""
@@ -509,6 +513,7 @@ async def broadcast_message(message):
         # Upewnijmy się, że media są w poprawnym formacie zanim wyślemy przez WebSocket
         if 'media' in message and message['media']:
             try:
+                logger.info(f"Przetwarzanie mediów przed wysłaniem: {message['media']}")
                 # Sprawdzamy czy media są już listą
                 if not isinstance(message['media'], list):
                     if isinstance(message['media'], str):
@@ -516,6 +521,9 @@ async def broadcast_message(message):
                     # Jeśli nadal nie jest listą, to konwertujemy na listę
                     if not isinstance(message['media'], list):
                         message['media'] = [message['media']]
+                # Upewniamy się, że wszystkie elementy w liście są prawidłowymi obiektami mediów
+                message['media'] = [m for m in message['media'] if isinstance(m, dict) and 'data' in m]
+                logger.info(f"Media po przetworzeniu: {len(message['media'])} elementów")
             except Exception as e:
                 logger.error(f"Błąd podczas przygotowywania mediów dla WebSocket: {str(e)}")
                 message['media'] = []
@@ -548,6 +556,11 @@ async def broadcast_message(message):
 # Handler dla nowych wiadomości
 async def handle_new_message(event):
     logger.info("=== handle_new_message ===")
+    logger.info(f"ID czatu: {getattr(event, 'chat_id', None)} | grouped_id: {getattr(event, 'grouped_id', None)} | ID wiadomości: {getattr(event, 'id', None)}")
+    logger.info(f"Typ eventu: {type(event)} | Czy media: {hasattr(event, 'media') and event.media is not None}")
+    if hasattr(event, 'media') and event.media:
+        logger.info(f"Typ media: {type(event.media)}")
+    logger.info(f"Treść: {getattr(event, 'raw_text', '')}")
     try:
         chat = await event.get_chat()
         sender = await event.get_sender()
@@ -568,11 +581,43 @@ async def handle_new_message(event):
         if getattr(sender, 'last_name', None):
             sender_name += ' ' + sender.last_name
         
-        # Pobieramy timezone z daty wysłania
         message_timezone = event.date.tzinfo
         
         # Pobieramy media z wiadomości
         media_list = await get_media_from_message(event)
+        
+        # Obsługa albumów (grouped_id)
+        grouped_id = getattr(event, 'grouped_id', None)
+        if grouped_id:
+            key = (str(event.chat_id), str(grouped_id))
+            if key not in grouped_messages_buffer:
+                grouped_messages_buffer[key] = {
+                    'message': event.raw_text or '',
+                    'chat_id': str(chat.id),
+                    'chat_title': getattr(chat, 'title', None) or getattr(chat, 'username', None) or 'Prywatny',
+                    'chat_type': chat_type,
+                    'sender_id': str(sender.id if sender else 0),
+                    'sender_name': sender_name or 'Nieznany',
+                    'timestamp': event.date,
+                    'received_at': datetime.now(message_timezone),
+                    'is_new': True,
+                    'media': []
+                }
+            # Dodaj media do bufora
+            grouped_messages_buffer[key]['media'].extend(media_list)
+            # Aktualizuj timestamp na najnowszy
+            grouped_messages_buffer[key]['timestamp'] = event.date
+            grouped_messages_buffer[key]['received_at'] = datetime.now(message_timezone)
+            # Ustaw/odnów timer
+            if key in grouped_messages_timers:
+                grouped_messages_timers[key].cancel()
+            loop = asyncio.get_event_loop()
+            grouped_messages_timers[key] = loop.call_later(
+                GROUPED_MESSAGE_TIMEOUT,
+                lambda: asyncio.ensure_future(save_grouped_message(key))
+            )
+            return  # nie zapisuj pojedynczej wiadomości od razu
+        # --- koniec obsługi grouped_id ---
         
         message_data = {
             'message': event.raw_text,
@@ -633,6 +678,33 @@ Odebrano: {log_data['received_at']}
     except Exception as e:
         logger.error(f"Błąd podczas przetwarzania wiadomości: {str(e)}")
         logger.exception(e)  # Dodajemy pełny stacktrace błędu
+
+
+# Funkcja do zapisu zbuforowanego albumu
+async def save_grouped_message(key):
+    grouped = grouped_messages_buffer.pop(key, None)
+    grouped_messages_timers.pop(key, None)
+    if grouped:
+        await save_message_to_db(grouped)
+        # Przygotuj dane do WebSocket i webhooka
+        websocket_data = grouped.copy()
+        websocket_data['timestamp'] = websocket_data['timestamp'].isoformat()
+        websocket_data['received_at'] = websocket_data['received_at'].isoformat()
+        message_history.append(websocket_data)
+        await broadcast_message(websocket_data)
+        # Webhook bez base64
+        log_media = []
+        for media in grouped.get('media', []):
+            media_copy = media.copy()
+            if 'data' in media_copy:
+                data_size = len(media_copy['data'])
+                media_copy['data'] = f"[BASE64 DATA: {data_size // 1024} KB]"
+            log_media.append(media_copy)
+        webhook_data = grouped.copy()
+        webhook_data['media'] = log_media
+        webhook_data['timestamp'] = webhook_data['timestamp'].isoformat()
+        webhook_data['received_at'] = webhook_data['received_at'].isoformat()
+        await send_to_webhook(webhook_data)
 
 
 async def handle_messages(request):

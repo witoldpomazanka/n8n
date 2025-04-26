@@ -229,8 +229,11 @@
             const headerDiv = document.createElement('div');
             headerDiv.className = 'message-header';
             headerDiv.innerHTML = `
+                <div style="display: flex; flex-direction: column;">
+                    <span class="chat-title">${message.chat_title || 'Prywatny'}</span>
+                    <span class="timestamp">${formatDate(message.timestamp)}</span>
+                </div>
                 <span class="sender-name">${message.sender_name}</span>
-                <span class="chat-title">${message.chat_title || 'Prywatny'}</span>
             `;
             messageDiv.appendChild(headerDiv);
             
@@ -291,15 +294,6 @@
                 
                 messageDiv.appendChild(mediaContainer);
             }
-            
-            // Dodajemy znaczniki czasu
-            const timestampDiv = document.createElement('div');
-            timestampDiv.className = 'message-header';
-            timestampDiv.innerHTML = `
-                <span class="timestamp">Wysłano: ${formatDate(message.timestamp)}</span>
-                <span class="timestamp">Odebrano: ${formatDate(message.received_at)}</span>
-            `;
-            messageDiv.appendChild(timestampDiv);
             
             return messageDiv;
         }
@@ -366,6 +360,7 @@
                                 
                                 // Dodajemy wiadomości - w kontenerze będą w odwróconej kolejności
                                 sortedMessages.forEach(message => {
+                                    console.log('Przetwarzanie wiadomości z historii:', message);
                                     const messageElement = createMessageElement(message);
                                     messagesContainer.appendChild(messageElement);
                                 });
@@ -375,6 +370,7 @@
                             data.message.is_new = true;
                             
                             console.log('Otrzymano nową wiadomość:', data.message);
+                            console.log('Liczba mediów w wiadomości:', data.message.media ? data.message.media.length : 0);
                             
                             // Sprawdzamy czy media są prawidłowo sformatowane dla nowej wiadomości
                             if (data.message.media && !Array.isArray(data.message.media)) {
