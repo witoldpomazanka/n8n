@@ -390,88 +390,88 @@ async def load_historical_messages():
     """Pobiera historyczne wiadomości z Telegrama i zapisuje je do bazy danych"""
     logger.info("=== load_historical_messages ===")
     global client
-    
     try:
-        # Sprawdzamy ostatni timestamp z bazy danych
         latest_timestamp = await get_latest_message_timestamp()
-        
         if latest_timestamp:
             logger.info(f"Ostatnia wiadomość z datą: {latest_timestamp}")
         else:
             logger.info("Brak wiadomości w bazie danych, pobieranie całej historii")
-        
-        # Licznik dodanych wiadomości
         added_messages = 0
-        
-        # Iterujemy przez wszystkie dialogi
         async for dialog in client.iter_dialogs():
-            # Określamy typ czatu
-            chat = dialog.entity
-            chat_type = 'unknown'
-            
-            if isinstance(chat, User):
-                chat_type = 'private'
-            elif isinstance(chat, Chat):
-                chat_type = 'group'
-            elif isinstance(chat, Channel):
-                if getattr(chat, 'broadcast', False):
-                    chat_type = 'channel'
-                else:
-                    chat_type = 'supergroup'
-            
-            logger.info(f"Pobieranie wiadomości z dialogu: {dialog.name} (id: {dialog.id}, typ: {chat_type})")
-            
-            # Pobieramy wiadomości z dialogu (limit 100 per dialog)
+            logger.info(f"Pobieranie wiadomości z dialogu: {dialog.name} (id: {dialog.id})")
             messages_to_process = []
             async for message in client.iter_messages(dialog.id, limit=100):
-                # Jeśli mamy najnowszą wiadomość z bazy, pomijamy starsze
                 if latest_timestamp and message.date <= latest_timestamp:
                     continue
-                
                 messages_to_process.append(message)
-            
-            # Przetwarzamy wiadomości dla danego dialogu
+            # --- BUFOROWANIE ALBUMÓW ---
+            grouped_buffer = {}
             for message in messages_to_process:
                 try:
                     chat = await message.get_chat()
+                    # Określamy typ czatu dla każdej wiadomości
+                    chat_type = 'unknown'
+                    if isinstance(chat, User):
+                        chat_type = 'private'
+                    elif isinstance(chat, Chat):
+                        chat_type = 'group'
+                    elif isinstance(chat, Channel):
+                        if getattr(chat, 'broadcast', False):
+                            chat_type = 'channel'
+                        else:
+                            chat_type = 'supergroup'
                     sender = await message.get_sender()
                     sender_name = getattr(sender, 'first_name', '') if sender else ''
                     if sender and getattr(sender, 'last_name', None):
                         sender_name += ' ' + sender.last_name
-                    
                     message_timezone = message.date.tzinfo
-                    
-                    # Pobieramy media z wiadomości
                     media_list = await get_media_from_message(message)
-                    
-                    message_data = {
-                        'message': message.text or '',
-                        'chat_id': str(chat.id),
-                        'chat_title': getattr(chat, 'title', None) or getattr(chat, 'username', None) or 'Prywatny',
-                        'chat_type': chat_type,
-                        'sender_id': str(sender.id if sender else 0),
-                        'sender_name': sender_name or 'Nieznany',
-                        'timestamp': message.date,  # Używamy obiektu datetime zamiast stringa
-                        'received_at': datetime.now(message_timezone),  # Używamy obiektu datetime zamiast stringa
-                        'is_new': False,  # Historyczne wiadomości nie są nowe
-                        'media': media_list
-                    }
-                    
-                    # Zapisujemy wiadomość do bazy danych
-                    await save_message_to_db(message_data)
-                    added_messages += 1
+                    grouped_id = getattr(message, 'grouped_id', None)
+                    chat_id = str(chat.id)
+                    if grouped_id:
+                        key = (chat_id, str(grouped_id))
+                        if key not in grouped_buffer:
+                            grouped_buffer[key] = {
+                                'message': message.text or '',
+                                'chat_id': chat_id,
+                                'chat_title': getattr(chat, 'title', None) or getattr(chat, 'username', None) or 'Prywatny',
+                                'chat_type': chat_type,
+                                'sender_id': str(sender.id if sender else 0),
+                                'sender_name': sender_name or 'Nieznany',
+                                'timestamp': message.date,
+                                'received_at': datetime.now(message_timezone),
+                                'is_new': False,
+                                'media': []
+                            }
+                        grouped_buffer[key]['media'].extend(media_list)
+                        # Aktualizuj timestamp na najnowszy
+                        grouped_buffer[key]['timestamp'] = message.date
+                        grouped_buffer[key]['received_at'] = datetime.now(message_timezone)
+                    else:
+                        message_data = {
+                            'message': message.text or '',
+                            'chat_id': chat_id,
+                            'chat_title': getattr(chat, 'title', None) or getattr(chat, 'username', None) or 'Prywatny',
+                            'chat_type': chat_type,
+                            'sender_id': str(sender.id if sender else 0),
+                            'sender_name': sender_name or 'Nieznany',
+                            'timestamp': message.date,
+                            'received_at': datetime.now(message_timezone),
+                            'is_new': False,
+                            'media': media_list
+                        }
+                        await save_message_to_db(message_data)
+                        added_messages += 1
                 except Exception as e:
                     logger.error(f"Błąd podczas przetwarzania wiadomości historycznej: {str(e)}")
                     logger.exception(e)
-        
+            # Po przetworzeniu wszystkich wiadomości z dialogu, zapisz albumy
+            for grouped in grouped_buffer.values():
+                await save_message_to_db(grouped)
+                added_messages += 1
         logger.info(f"Dodano {added_messages} nowych wiadomości do bazy danych")
-        
-        # Ładujemy wiadomości z bazy do bufora
         await load_messages_from_db()
-        
-        # Oznaczamy wszystkie wiadomości jako stare
         await mark_all_messages_as_old()
-        
         return True
     except Exception as e:
         logger.error(f"Błąd podczas ładowania historycznych wiadomości: {str(e)}")
