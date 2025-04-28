@@ -72,8 +72,22 @@ services:
       - n8n
       - postgres
 
+  bybit-trade:
+    image: bybit-trade
+    restart: always
+    ports:
+      - "8888:8888"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - BYBIT_API_KEY=${BYBIT_API_KEY}
+      - BYBIT_API_SECRET=${BYBIT_API_SECRET}
+    depends_on:
+      - postgres
+
 volumes:
   n8n_postgres_data:
   n8n_data:
   telethon_session:
-  pgadmin_data: 
+  pgadmin_data:
