@@ -367,6 +367,10 @@ async def load_historical_messages():
     logger.info("=== load_historical_messages ===")
     global client
     try:
+        if not client.is_connected() or not await client.is_user_authorized():
+            logger.warning("Klient nie jest połączony lub wymaga autoryzacji")
+            return False
+            
         latest_timestamp = await get_latest_message_timestamp()
         added_messages = 0
         async for dialog in client.iter_dialogs():
@@ -754,13 +758,30 @@ async def init_client():
         logger.warning(f"Katalog sesji nie istnieje, tworzę: {session_dir}")
         os.makedirs(session_dir)
     
-    if not os.path.exists(session_file):
-        logger.warning("Nie znaleziono pliku sesji - wymagana będzie autoryzacja")
+    # Jeśli plik sesji istnieje ale jest nieważny, usuwamy go
+    if os.path.exists(session_file):
+        try:
+            client = TelegramClient(session_file, API_ID, API_HASH)
+            await client.connect()
+            if not await client.is_user_authorized():
+                logger.warning("Sesja nieważna - usuwam plik sesji")
+                await client.disconnect()
+                os.remove(session_file)
+                client = None
+        except Exception as e:
+            logger.error(f"Błąd podczas sprawdzania sesji: {str(e)}")
+            logger.warning("Usuwam uszkodzony plik sesji")
+            os.remove(session_file)
+            client = None
     
-    client = TelegramClient(session_file, API_ID, API_HASH)
+    # Tworzymy nowego klienta jeśli nie istnieje
+    if not client:
+        client = TelegramClient(session_file, API_ID, API_HASH)
     
     try:
-        await client.connect()
+        if not client.is_connected():
+            await client.connect()
+        
         if await client.is_user_authorized():
             logger.info("✓ Sesja jest aktywna i zautoryzowana")
             me = await client.get_me()
@@ -771,6 +792,7 @@ async def init_client():
             logger.warning("✗ Sesja wymaga autoryzacji")
     except Exception as e:
         logger.error(f"Błąd podczas sprawdzania stanu sesji: {str(e)}")
+        logger.warning("✗ Sesja wymaga autoryzacji")
     
     return client
 
@@ -809,9 +831,6 @@ async def main():
     success = await init_database()
     if not success:
         logger.error("Nie udało się połączyć z bazą danych - aplikacja używa tylko pamięci")
-    else:
-        # Pobieranie i zapisywanie historycznych wiadomości
-        await load_historical_messages()
     
     # Konfiguracja serwera HTTP
     app = web.Application()
@@ -820,7 +839,7 @@ async def main():
     app.router.add_post('/request_code', request_code)
     app.router.add_post('/verify_code', verify_code)
     app.router.add_get('/check_session', check_session)
-    app.router.add_get('/reload', reload_messages)  # Nowy endpoint do ponownego ładowania wiadomości
+    app.router.add_get('/reload', reload_messages)
     
     # Obsługa WebSocketa
     async def websocket_route_handler(request):
@@ -881,7 +900,21 @@ async def main():
     
     # Uruchomienie klienta
     try:
-        await client.run_until_disconnected()
+        if client and await client.is_user_authorized():
+            # Pobieranie historycznych wiadomości tylko jeśli klient jest zautoryzowany
+            await load_historical_messages()
+            # Uruchamiamy klienta tylko jeśli jest zautoryzowany
+            await client.run_until_disconnected()
+        else:
+            # Jeśli nie jest zautoryzowany, czekamy na autoryzację
+            logger.warning("Oczekiwanie na autoryzację...")
+            while True:
+                await asyncio.sleep(5)  # Sprawdzamy co 5 sekund
+                if client and await client.is_user_authorized():
+                    logger.info("Klient został zautoryzowany!")
+                    await load_historical_messages()
+                    await client.run_until_disconnected()
+                    break
     except Exception as e:
         logger.error(f"Błąd w głównej funkcji: {str(e)}")
     finally:

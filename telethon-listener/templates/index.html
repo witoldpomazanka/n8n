@@ -97,17 +97,22 @@
         .auth-container {
             background-color: white;
             border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             text-align: center;
+            max-width: 400px;
+            margin: 40px auto;
+            border: 1px solid #e5e7eb;
         }
         .auth-info {
-            background-color: #dbeafe;
+            background-color: #f3f4f6;
             padding: 15px;
             margin-bottom: 20px;
-            border-radius: 4px;
-            border: 1px solid #3b82f6;
-            color: #1e40af;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+            color: #374151;
+            font-size: 1.1em;
+            font-weight: 500;
         }
         .auth-error {
             background-color: #fee2e2;
@@ -118,28 +123,46 @@
             background-color: #3b82f6;
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
+            padding: 12px 24px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 16px;
-            margin-right: 10px;
+            margin: 10px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            width: 100%;
+            max-width: 250px;
         }
         button:hover {
             background-color: #2563eb;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button:active {
+            transform: translateY(0);
         }
         input {
-            padding: 8px;
+            padding: 12px;
             font-size: 16px;
-            border: 1px solid #d1d5db;
-            border-radius: 4px;
-            margin-right: 10px;
+            border: 2px solid #d1d5db;
+            border-radius: 6px;
+            margin: 10px 0;
+            width: 100%;
+            max-width: 250px;
+            transition: border-color 0.2s ease;
+        }
+        input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
         .hidden {
             display: none;
         }
         #countdown {
-            color: #4b5563;
-            margin-top: 10px;
+            color: #6b7280;
+            margin-top: 15px;
+            font-size: 0.9em;
         }
         #messages-container {
             margin-top: 20px;
@@ -487,6 +510,7 @@
             });
         }
 
+        // Funkcja sprawdzająca stan sesji
         async function checkSession() {
             try {
                 const response = await fetch('/check_session');
@@ -494,25 +518,27 @@
                 
                 if (data.authorized) {
                     sessionStatusElement.textContent = 'Sesja: Aktywna';
-                    sessionStatusElement.className = 'session-status active';
+                    sessionStatusElement.classList.remove('inactive');
+                    sessionStatusElement.classList.add('active');
                     authContainerElement.classList.add('hidden');
-                    reloadButtonElement.classList.remove('hidden');  // Pokazujemy przycisk odświeżania
-                    
-                    // Połącz z WebSocket po potwierdzeniu, że sesja jest aktywna
+                    reloadButtonElement.classList.remove('hidden');
                     connectWebSocket();
                 } else {
                     sessionStatusElement.textContent = 'Sesja: Nieaktywna';
-                    sessionStatusElement.className = 'session-status inactive';
+                    sessionStatusElement.classList.remove('active');
+                    sessionStatusElement.classList.add('inactive');
                     authContainerElement.classList.remove('hidden');
                     document.getElementById('requestCode').classList.remove('hidden');
-                    reloadButtonElement.classList.add('hidden');  // Ukrywamy przycisk odświeżania
+                    reloadButtonElement.classList.add('hidden');
                 }
             } catch (error) {
                 console.error('Błąd podczas sprawdzania sesji:', error);
-                sessionStatusElement.textContent = 'Sesja: Błąd połączenia';
-                sessionStatusElement.className = 'session-status inactive';
+                updateAuthStatus('Błąd podczas sprawdzania sesji', true);
             }
         }
+
+        // Wywołujemy sprawdzenie sesji przy ładowaniu strony
+        document.addEventListener('DOMContentLoaded', checkSession);
 
         async function reloadMessages() {
             try {
@@ -537,9 +563,6 @@
                 reloadButtonElement.textContent = 'Odśwież wiadomości';
             }
         }
-
-        // Sprawdź status sesji przy ładowaniu strony
-        checkSession();
     </script>
 </body>
 </html> 
