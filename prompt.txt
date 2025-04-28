@@ -1,9 +1,10 @@
 Act like a professional crypto trader.
 Detect if the content I provide below is a trader move.
+If not, or you are not sure, return empty json and nothing more than {}
 If so, I would like you to respond in json format, without the comments. Just the json, no other text!
 If the value for a specific field is not determined, don't add it.
-Mandatory keys are coin, leverage and type.
-If there are more than one take profit, use tp1, tp2 and so on as long as there are multiple.
+Mandatory keys are coin, leverage and type. If any of it is not present, return empty json {}
+If there are more than one take profit, use tp1, tp2 max to tp5.
 If not, use single takeProfit.
 For example 1% or 2% is suggested value for USDT, do not use this value.
 Output json format:

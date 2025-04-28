@@ -86,6 +86,14 @@ services:
     depends_on:
       - postgres
 
+  request-logger:
+    image: request-logger:latest
+    restart: always
+    ports:
+      - "9999:9999"
+    depends_on:
+      - postgres
+
 volumes:
   n8n_postgres_data:
   n8n_data:
