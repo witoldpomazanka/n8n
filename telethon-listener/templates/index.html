@@ -383,7 +383,6 @@
                                 
                                 // Dodajemy wiadomości - w kontenerze będą w odwróconej kolejności
                                 sortedMessages.forEach(message => {
-                                    console.log('Przetwarzanie wiadomości z historii:', message);
                                     const messageElement = createMessageElement(message);
                                     messagesContainer.appendChild(messageElement);
                                 });
