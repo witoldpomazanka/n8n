@@ -1,0 +1,22 @@
+Act like a professional crypto trader.
+Detect if the content I provide below is a trader move.
+If so, I would like you to respond in json format, without the comments. Just the json, no other text!
+If the value for a specific field is not determined, don't add it.
+Mandatory keys are coin, leverage and type.
+If there are more than one take profit, use tp1, tp2 and so on as long as there are multiple.
+If not, use single takeProfit.
+Output json format:
+{
+"coin": "BTC",       // String, just the symbol, no usdt at the end
+"leverage": 15,      // int, required
+"type": "LONG",      // string, "LONG" or "SHORT" depending on the move definition, required
+"tp1" : 1.0,  	     // decimal, take profit 1 if determined
+"tp2" : 2.2,   	     // decimal, take profit 2 if determined
+"tp3" : 3.5,   	     // decimal, take profit 3 if determined
+"tp4" : 4.8,   	     // decimal, take profit 4 if determined
+"tp5" : 6.8,   	     // decimal, take profit 4 if determined
+"takeProfit" : 5.0,  // decimal, if there is only one take profit, if determined
+"stopLoss" : 0.8    // decimal, stop loss, if determined
+}
+
+message:

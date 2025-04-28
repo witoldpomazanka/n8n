@@ -50,7 +50,7 @@ services:
       - postgres
 
   telethon-listener:
-    build: ./telethon-listener
+    image: telegram-listener
     restart: always
     ports:
       - "8080:8080"
