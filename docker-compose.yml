@@ -10,6 +10,8 @@ services:
       - n8n_postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    networks:
+      - custom_network
 
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -24,6 +26,8 @@ services:
       - pgadmin_data:/var/lib/pgadmin
     depends_on:
       - postgres
+    networks:
+      - custom_network
 
   n8n:
     image: n8nio/n8n:1.89.2
@@ -48,6 +52,8 @@ services:
       - n8n_data:/home/node/.n8n
     depends_on:
       - postgres
+    networks:
+      - custom_network
 
   telethon-listener:
     image: q910705/telegram-client:dc157c443ede144337283e5563ecb5bd4746e80a
@@ -71,18 +77,26 @@ services:
     depends_on:
       - n8n
       - postgres
+    networks:
+      - custom_network
 
-  bybit-trade:
-    image: q910705/bybit-trade:2b805b9c2d7ba0841c4098cf036dbdff82c8e82e
+  bybit-trade-zarabiara:
+    image: q910705/bybit-trade:5d6c948b8f4400ff9dd7770daecf00f76e6ff9ec
     restart: always
     ports:
       - "8888:8888"
     environment:
       - BYBIT_API_KEY=${BYBIT_API_KEY}
       - BYBIT_API_SECRET=${BYBIT_API_SECRET}
+    networks:
+      - custom_network
 
 volumes:
   n8n_postgres_data:
   n8n_data:
   telethon_session:
   pgadmin_data:
+
+networks:
+  custom_network:
+    driver: bridge

@@ -1,5 +1,5 @@
 {
-  "name": "Zarabiara",
+  "name": "My workflow",
   "nodes": [
     {
       "parameters": {
@@ -10,10 +10,10 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        220,
-        240
+        960,
+        -360
       ],
-      "id": "ba18fee9-849c-4344-bb6f-62b10d8021ff",
+      "id": "7e71d2cb-3d0e-4160-857f-3f14ce768713",
       "name": "Telegram message",
       "webhookId": "72f1ca61-b002-4cff-9f26-3b7ee46d7a0e"
     },
@@ -37,14 +37,14 @@
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 1.8,
       "position": [
-        660,
-        240
+        1400,
+        -360
       ],
-      "id": "b221c7d4-591b-4c27-8db1-a38f96a02392",
+      "id": "cb6e2ff5-91c5-4789-a7a7-117be8e28f33",
       "name": "OpenAI",
       "credentials": {
         "openAiApi": {
-          "id": "ZZrLKsXQ5dgEbhhY",
+          "id": "h3ZxskVWdxA8ZroA",
           "name": "OpenAi account"
         }
       }
@@ -52,7 +52,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://bybit-trade:8888/api/bybit/positions/market/advanced",
+        "url": "http://bybit-trade-zarabiara:8888/api/bybit/positions/market/advanced",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -77,10 +77,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1020,
-        240
+        1760,
+        -360
       ],
-      "id": "5730f4d6-1fdf-42ac-885c-6f922591b222",
+      "id": "78d7ef42-722c-4b9f-afb8-c395e56a6a43",
       "name": "HTTP Request"
     }
   ],
@@ -113,12 +113,11 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "b51a7ccf-2f61-43aa-ab46-e1996125c1a4",
+  "versionId": "c55e34de-46bf-493e-a422-ecda44b6c920",
   "meta": {
-    "templateId": "self-building-ai-agent",
     "templateCredsSetupCompleted": true,
-    "instanceId": "c96ac4da846c8135fcb26e519cf5e2e684f54965d48f935e561738e14cfefd33"
+    "instanceId": "38a2a5f52b4cad63c4ea75a093641d9c7391f96dec5f58893008641c305249bb"
   },
-  "id": "Hv8p6lrlVfyKwGTg",
+  "id": "YpxW6A9ADA1EWwDk",
   "tags": []
 }
