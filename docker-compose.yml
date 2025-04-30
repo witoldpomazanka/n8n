@@ -50,7 +50,7 @@ services:
       - postgres
 
   telethon-listener:
-    image: telegram-listener
+    image: q910705/telegram-client:dc157c443ede144337283e5563ecb5bd4746e80a
     restart: always
     ports:
       - "8080:8080"
@@ -73,26 +73,13 @@ services:
       - postgres
 
   bybit-trade:
-    image: bybit-trade
+    image: q910705/bybit-trade:867f348e1a33137ae3895f3c1939e6d2cee8b67e
     restart: always
     ports:
       - "8888:8888"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB}
-      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
-      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - BYBIT_API_KEY=${BYBIT_API_KEY}
       - BYBIT_API_SECRET=${BYBIT_API_SECRET}
-    depends_on:
-      - postgres
-
-  request-logger:
-    image: request-logger:latest
-    restart: always
-    ports:
-      - "9999:9999"
-    depends_on:
-      - postgres
 
 volumes:
   n8n_postgres_data:

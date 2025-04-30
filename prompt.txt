@@ -1,13 +1,13 @@
 Act like a professional crypto trader.
 Detect if the content I provide below is a trader move.
-If not, or you are not sure, return empty json and nothing more than {}
 If so, I would like you to respond in json format, without the comments. Just the json, no other text!
+If not, or you are not sure, return json and nothing more than {"content": "invalid"}
 If the value for a specific field is not determined, don't add it.
-Mandatory keys are coin, leverage and type. If any of it is not present, return empty json {}
+Mandatory keys are coin, leverage and type. If any of it is not present, return json {"content": "invalid"}
 If there are more than one take profit, use tp1, tp2 max to tp5.
 If not, use single takeProfit.
 For example 1% or 2% is suggested value for USDT, do not use this value.
-Output json format:
+Output json format, no other text, just the json, always, remember:
 {
 "coin": "BTC",       // String, just the symbol, no usdt at the end
 "leverage": 15,      // int, required
@@ -22,18 +22,4 @@ Output json format:
 }
 
 message:
-TIA/USDT
-
-LONG
-1% LIMIT 2,755
-
-TARGETY
-2,78
-2,817
-2,86
-2,89
-2,95
-
-stop loss 2,7
-
-15-20x/ 1%
+{{$json["body"]["message"]}}

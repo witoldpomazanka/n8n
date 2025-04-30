@@ -1,0 +1,124 @@
+{
+  "name": "Zarabiara",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "telegram",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        240
+      ],
+      "id": "ba18fee9-849c-4344-bb6f-62b10d8021ff",
+      "name": "Telegram message",
+      "webhookId": "72f1ca61-b002-4cff-9f26-3b7ee46d7a0e"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-2025-04-14",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-2025-04-14"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Act like a professional crypto trader.\nDetect if the content I provide below is a trader move.\nIf so, I would like you to respond in json format, without the comments. Just the json, no other text!\nIf not, or you are not sure, return json and nothing more than {\"content\": \"invalid\"}\nIf the value for a specific field is not determined, don't add it.\nMandatory keys are coin, leverage and type. If any of it is not present, return json {\"content\": \"invalid\"}\nIf there are more than one take profit, use tp1, tp2 max to tp5.\nIf not, use single takeProfit.\nFor example 1% or 2% is suggested value for USDT, do not use this value.\nOutput json format, no other text, just the json, always, remember:\n{\n\"coin\": \"BTC\",       // String, just the symbol, no usdt at the end\n\"leverage\": 15,      // int, required\n\"type\": \"LONG\",      // string, \"LONG\" or \"SHORT\" depending on the move definition, required\n\"tp1\" : 1.0,  \t     // decimal, take profit 1 if determined\n\"tp2\" : 2.2,   \t     // decimal, take profit 2 if determined\n\"tp3\" : 3.5,   \t     // decimal, take profit 3 if determined\n\"tp4\" : 4.8,   \t     // decimal, take profit 4 if determined\n\"tp5\" : 6.8,   \t     // decimal, take profit 4 if determined\n\"takeProfit\" : 5.0,  // decimal, if there is only one take profit, if determined\n\"stopLoss\" : 0.8    // decimal, stop loss, if determined\n}\n\nmessage:\n{{$json[\"body\"][\"message\"]}}\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        660,
+        240
+      ],
+      "id": "b221c7d4-591b-4c27-8db1-a38f96a02392",
+      "name": "OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "ZZrLKsXQ5dgEbhhY",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://bybit-trade:8888/api/bybit/positions/market/advanced",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{$json[\"message\"][\"content\"]}}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1020,
+        240
+      ],
+      "id": "5730f4d6-1fdf-42ac-885c-6f922591b222",
+      "name": "HTTP Request"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram message": {
+      "main": [
+        [
+          {
+            "node": "OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "b51a7ccf-2f61-43aa-ab46-e1996125c1a4",
+  "meta": {
+    "templateId": "self-building-ai-agent",
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c96ac4da846c8135fcb26e519cf5e2e684f54965d48f935e561738e14cfefd33"
+  },
+  "id": "Hv8p6lrlVfyKwGTg",
+  "tags": []
+}
