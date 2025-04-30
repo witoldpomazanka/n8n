@@ -73,7 +73,7 @@ services:
       - postgres
 
   bybit-trade:
-    image: q910705/bybit-trade:867f348e1a33137ae3895f3c1939e6d2cee8b67e
+    image: q910705/bybit-trade:2b805b9c2d7ba0841c4098cf036dbdff82c8e82e
     restart: always
     ports:
       - "8888:8888"
