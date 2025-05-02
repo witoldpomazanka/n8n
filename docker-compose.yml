@@ -85,7 +85,7 @@ services:
       - custom_network
 
   bybit-trade-zarabiara:
-    image: q910705/bybit-trade:6700ba6ed92a2af38c8447dba6444b31dc126629
+    image: q910705/bybit-trade:c4a3d33511ba425e2656f27601ef2eb396cee8ae
     restart: always
     ports:
       - "8888:8888"
@@ -97,7 +97,7 @@ services:
       - custom_network
 
   bybit-trade:
-    image: q910705/bybit-trade:6700ba6ed92a2af38c8447dba6444b31dc126629
+    image: q910705/bybit-trade:c4a3d33511ba425e2656f27601ef2eb396cee8ae
     restart: always
     ports:
       - "9999:9999"
@@ -106,11 +106,12 @@ services:
       - BYBIT_API_KEY=${BYBIT_API_KEY_BITCOIN_NOTIFIER}
       - BYBIT_API_SECRET=${BYBIT_API_SECRET_BITCOIN_NOTIFIER}
       - SERVER_PORT=9999
+      - RETRACEMENT_DIVIDER=4
     networks:
       - custom_network
 
   bitcoin-notifier:
-    image: q910705/bitcoin-notifier:6f7f80a5001bafa08607a7b47f1f53a3da608e92
+    image: q910705/bitcoin-notifier:b330fb69b90713937aa19d9c23e7aa45660e6afe
     container_name: bitcoin-notifier
     restart: always
     volumes:
