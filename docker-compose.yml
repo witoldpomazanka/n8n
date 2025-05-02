@@ -112,11 +112,10 @@ services:
       - custom_network
 
   bitcoin-notifier:
-    image: q910705/bitcoin-notifier:940bd3c6b56de0d0949b981c8dbf6e845dbdc9ea
+    image: q910705/bitcoin-notifier:bf1419c78d85fe23d8ca72da443c0b2b334083fe
     container_name: bitcoin-notifier
     restart: always
     volumes:
-      - bitcoin-notifier-data:/app
       - ./logs:/logs
     environment:
       - TZ=Europe/Warsaw
@@ -131,7 +130,6 @@ volumes:
   n8n_data:
   telethon_session:
   pgadmin_data:
-  bitcoin-notifier-data:
 
 networks:
   custom_network:
