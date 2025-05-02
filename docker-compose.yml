@@ -85,7 +85,7 @@ services:
       - custom_network
 
   bybit-trade-zarabiara:
-    image: q910705/bybit-trade:cece12d03c658f2f557fd69d403dec04b13457d2
+    image: q910705/bybit-trade:c8d4997bcc319fa055466c5ebbf8ea5db8ca4fa8
     restart: always
     ports:
       - "8888:8888"
