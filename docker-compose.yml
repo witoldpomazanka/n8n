@@ -112,7 +112,7 @@ services:
       - custom_network
 
   bitcoin-notifier:
-    image: q910705/bitcoin-notifier:c921251862bb6c98a10746708a47abf78f470a48
+    image: q910705/bitcoin-notifier:979c68d7d36e010483c3a4d214f35db3021778b1
     container_name: bitcoin-notifier
     restart: always
     volumes:
@@ -120,6 +120,7 @@ services:
     environment:
       - TZ=Europe/Warsaw
       - INDICATOR_LOG_PATH=/logs/indicator_levels.log
+      - SCORE_LOG_PATH=/logs/score_analysis.log
     env_file:
       - .env
     networks:
