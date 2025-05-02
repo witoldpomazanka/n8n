@@ -59,7 +59,7 @@ services:
       - custom_network
 
   telethon-listener:
-    image: q910705/telegram-client:dc157c443ede144337283e5563ecb5bd4746e80a
+    image: q910705/telegram-client:c1f692c02e3dd05bfff1264e92c46013dbcb52d3
     restart: always
     ports:
       - "8080:8080"
@@ -76,6 +76,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
+      - IGNORED_SENDERS=PinkPunkTradingBot,Tom_Trader81
     volumes:
       - telethon_session:/data
     depends_on:
