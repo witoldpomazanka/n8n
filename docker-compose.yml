@@ -91,8 +91,34 @@ services:
       - "8888:8888"
     environment:
       - TZ=Europe/Warsaw
-      - BYBIT_API_KEY=${BYBIT_API_KEY}
-      - BYBIT_API_SECRET=${BYBIT_API_SECRET}
+      - BYBIT_API_KEY=${BYBIT_API_KEY_TELEGRAM}
+      - BYBIT_API_SECRET=${BYBIT_API_SECRET_TELEGRAM}
+    networks:
+      - custom_network
+
+  bybit-trade:
+    image: q910705/bybit-trade:cece12d03c658f2f557fd69d403dec04b13457d2
+    restart: always
+    ports:
+      - "9999:9999"
+    environment:
+      - TZ=Europe/Warsaw
+      - BYBIT_API_KEY=${BYBIT_API_KEY_BITCOIN_NOTIFIER}
+      - BYBIT_API_SECRET=${BYBIT_API_SECRET_BITCOIN_NOTIFIER}
+      - SERVER_PORT=9999
+    networks:
+      - custom_network
+
+  bitcoin-notifier:
+    image: q910705/bitcoin-notifier:6f7f80a5001bafa08607a7b47f1f53a3da608e92
+    container_name: bitcoin-notifier
+    restart: always
+    volumes:
+      - bitcoin-notifier-data:/app
+    environment:
+      - TZ=Europe/Warsaw
+    env_file:
+      - .env
     networks:
       - custom_network
 
@@ -101,6 +127,7 @@ volumes:
   n8n_data:
   telethon_session:
   pgadmin_data:
+  bitcoin-notifier-data:
 
 networks:
   custom_network:
