@@ -76,7 +76,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - IGNORED_SENDERS=PinkPunkTradingBot,Tom_Trader81,Witu
+      - IGNORED_SENDERS=PinkPunkTradingBot,Tom_Trader81,Witu,Scott Golden,Tonie Kapitał Chat
     volumes:
       - telethon_session:/data
     depends_on:
