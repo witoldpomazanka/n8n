@@ -97,34 +97,34 @@ services:
     networks:
       - custom_network
 
-  bybit-trade:
-    image: q910705/bybit-trade:c4a3d33511ba425e2656f27601ef2eb396cee8ae
-    restart: always
-    ports:
-      - "9999:9999"
-    environment:
-      - TZ=Europe/Warsaw
-      - BYBIT_API_KEY=${BYBIT_API_KEY_BITCOIN_NOTIFIER}
-      - BYBIT_API_SECRET=${BYBIT_API_SECRET_BITCOIN_NOTIFIER}
-      - SERVER_PORT=9999
-      - RETRACEMENT_DIVIDER=4
-    networks:
-      - custom_network
+#  bybit-trade:
+#    image: q910705/bybit-trade:c4a3d33511ba425e2656f27601ef2eb396cee8ae
+#    restart: always
+#    ports:
+#      - "9999:9999"
+#    environment:
+#      - TZ=Europe/Warsaw
+#      - BYBIT_API_KEY=${BYBIT_API_KEY_BITCOIN_NOTIFIER}
+#      - BYBIT_API_SECRET=${BYBIT_API_SECRET_BITCOIN_NOTIFIER}
+#      - SERVER_PORT=9999
+#      - RETRACEMENT_DIVIDER=4
+#    networks:
+#      - custom_network
 
-  bitcoin-notifier:
-    image: q910705/bitcoin-notifier:979c68d7d36e010483c3a4d214f35db3021778b1
-    container_name: bitcoin-notifier
-    restart: always
-    volumes:
-      - ./logs:/logs
-    environment:
-      - TZ=Europe/Warsaw
-      - INDICATOR_LOG_PATH=/logs/indicator_levels.log
-      - SCORE_LOG_PATH=/logs/score_analysis.log
-    env_file:
-      - .env
-    networks:
-      - custom_network
+#  bitcoin-notifier:
+#    image: q910705/bitcoin-notifier:979c68d7d36e010483c3a4d214f35db3021778b1
+#    container_name: bitcoin-notifier
+#    restart: always
+#    volumes:
+#      - ./logs:/logs
+#    environment:
+#      - TZ=Europe/Warsaw
+#      - INDICATOR_LOG_PATH=/logs/indicator_levels.log
+#      - SCORE_LOG_PATH=/logs/score_analysis.log
+#    env_file:
+#      - .env
+#    networks:
+#      - custom_network
 
 volumes:
   n8n_postgres_data:
