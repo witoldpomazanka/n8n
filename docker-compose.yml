@@ -86,7 +86,7 @@ services:
       - custom_network
 
   bybit-trade-zarabiara:
-    image: q910705/bybit-trade:965078e16478baa44dc3b4f9c8220dd932da782e
+    image: q910705/bybit-trade:85efdabd53fc64994dc793c47e7a09c79aa57f9b
     restart: always
     ports:
       - "8888:8888"
@@ -94,6 +94,12 @@ services:
       - TZ=Europe/Warsaw
       - BYBIT_API_KEY=${BYBIT_API_KEY_TELEGRAM}
       - BYBIT_API_SECRET=${BYBIT_API_SECRET_TELEGRAM}
+      - MIN_USDT_AMOUNT_FOR_TRADE=${MIN_USDT_AMOUNT_FOR_TRADE}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER}
+      - TWILIO_RECIPIENT_PHONE=${TWILIO_RECIPIENT_PHONE}
+      - TWILIO_NOTIFICATIONS_ENABLED=${TWILIO_NOTIFICATIONS_ENABLED}
     networks:
       - custom_network
 
