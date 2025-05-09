@@ -77,7 +77,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - IGNORED_SENDERS=PinkPunkTradingBot,Tom_Trader81,Scott Golden,Tonie Kapitał Chat,DevSellingBot Lounge,Zarabiara
+      - IGNORED_SENDERS=PinkPunkTradingBot,Tom_Trader81,Scott Golden,Tonie Kapitał Chat,DevSellingBot Lounge
     volumes:
       - telethon_session:/data
     depends_on:
@@ -87,7 +87,7 @@ services:
       - custom_network
 
   bybit-trade-zarabiara:
-    image: q910705/bybit-trade:c819a45872f18ef35085e99c90700c945dd7e9e7
+    image: q910705/bybit-trade:fe5804f07bdfd3a25e22a3044634547cf24b13f8
     restart: always
     ports:
       - "0.0.0.0:8888:8888"

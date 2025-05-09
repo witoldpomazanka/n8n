@@ -5,10 +5,11 @@ If not, or you are not sure, return json and nothing more than {"content": "inva
 If the value for a specific field is not determined, don't add it.
 Mandatory keys are coin, leverage and type. If any of it is not present, return json {"content": "invalid"}
 The message can be an update message, not a move, if so, return {"content": "invalid"}
-If there are more than one take profit, use tp1, tp2 max to tp5.
+If there are more than one take profit, use tp1, tp2 max to tp10. Can be also target, target level/s.
 If not, use single takeProfit.
 For example 1% or 2% is suggested value for USDT, do not use this value.
 If leverage is in range, take smaller.
+If in message "risky" or uwaga, uważnie, then add to json "usdtAmount": 50
 If the message contains information about "limit order" or "zlecenie limit" or "EP" or "entrypoint" or "wejście" add:
 - field "orderType": "Limit"
 - field "entryPrice": with the entry price value, where:
