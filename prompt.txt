@@ -4,6 +4,7 @@ If so, I would like you to respond in json format, without the comments. Just th
 If not, or you are not sure, return json and nothing more than {"content": "invalid"}
 If the value for a specific field is not determined, don't add it.
 Mandatory keys are coin, leverage and type. If any of it is not present, return json {"content": "invalid"}
+The message can be an update message, not a move, if so, return {"content": "invalid"}
 If there are more than one take profit, use tp1, tp2 max to tp5.
 If not, use single takeProfit.
 For example 1% or 2% is suggested value for USDT, do not use this value.
