@@ -7,11 +7,21 @@ Mandatory keys are coin, leverage and type. If any of it is not present, return 
 If there are more than one take profit, use tp1, tp2 max to tp5.
 If not, use single takeProfit.
 For example 1% or 2% is suggested value for USDT, do not use this value.
+If leverage is in range, take smaller.
+If the message contains information about "limit order" or "zlecenie limit" or "EP" or "entrypoint" or "wejście" add:
+- field "orderType": "Limit"
+- field "entryPrice": with the entry price value, where:
+  - for LONG orders, use the lower value from the EP range if there is a range for them or just the one specified
+  - for SHORT orders, use the higher value from the EP range if there is a range for them or just the one specified
+If no such information is present, assume a market order by default (don't add orderType field).
+
 Output json format, no other text, just the json, always, remember:
 {
 "coin": "BTC",       // String, just the symbol, no usdt at the end
 "leverage": 15,      // int, required
 "type": "LONG",      // string, "LONG" or "SHORT" depending on the move definition, required
+"orderType": "Limit", // string, only if it's a limit order
+"entryPrice": 101.600, // decimal, entry price only for limit orders
 "tp1" : 1.0,  	     // decimal, take profit 1 if determined
 "tp2" : 2.2,   	     // decimal, take profit 2 if determined
 "tp3" : 3.5,   	     // decimal, take profit 3 if determined
