@@ -80,6 +80,7 @@ services:
       - POSTGRES_PORT=5432
       - IGNORED_SENDERS=PinkPunkTradingBot,Tom_Trader81,Scott Golden,Tonie Kapitał Chat,DevSellingBot Lounge
       - DEGEN_GEMS_CHANNEL_NAMES=polski_degen - GEMS,prywatny
+      - CHAIN_TO_CHANNEL_MAPPING=SOL,PinkPunk Trading Bot,Base,PinkPunk Trading Bot,ETH,PinkPunk Trading Bot
     volumes:
       - telethon_session:/data
     depends_on:
