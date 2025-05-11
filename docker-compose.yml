@@ -60,7 +60,7 @@ services:
       - custom_network
 
   telethon-listener:
-    image: q910705/telegram-client:486d5870e961a3f0524194281e5e6c3b6b045653
+    image: q910705/telegram-client:adf5f061c47b3de75f866b0e6b307f24aba225e6
     restart: always
     ports:
       - "0.0.0.0:8080:8080"
