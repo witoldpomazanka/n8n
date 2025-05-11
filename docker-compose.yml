@@ -60,7 +60,7 @@ services:
       - custom_network
 
   telethon-listener:
-    image: q910705/telegram-client:a9ab0b46cfa6bc917500c3b969b87412f89dd809
+    image: q910705/telegram-client:ce09cb0f1c4e5424e3a4185f194cb9a21cff828f
     restart: always
     ports:
       - "0.0.0.0:8080:8080"
@@ -80,7 +80,7 @@ services:
       - POSTGRES_PORT=5432
       - IGNORED_SENDERS=PinkPunkTradingBot,Tom_Trader81,Scott Golden,Tonie Kapitał Chat,DevSellingBot Lounge
       - DEGEN_GEMS_CHANNEL_NAMES=polski_degen - GEMS,prywatny
-      - CHAIN_TO_CHANNEL_MAPPING=SOL,PinkPunk Trading Bot,Base,PinkPunk Trading Bot,ETH,PinkPunk Trading Bot
+      - CHAIN_TO_CHANNEL_MAPPING=SOL,PinkPunk Trading Bot,Buy 0.1 SOL,Base,PinkPunk Trading Bot,XXX,ETH,PinkPunk Trading Bot,XXX
     volumes:
       - telethon_session:/data
     depends_on:
