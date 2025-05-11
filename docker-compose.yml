@@ -79,7 +79,7 @@ services:
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - IGNORED_SENDERS=PinkPunkTradingBot,Tom_Trader81,Scott Golden,Tonie Kapitał Chat,DevSellingBot Lounge
-      - DEGEN_GEMS_CHANNEL_NAMES=polski_degen - GEMS,zarabiara
+      - DEGEN_GEMS_CHANNEL_NAMES=polski_degen - GEMS,prywatny
     volumes:
       - telethon_session:/data
     depends_on:
