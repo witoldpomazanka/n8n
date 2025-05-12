@@ -59,6 +59,14 @@
             {
               "name": "Content-Type",
               "value": "application/json"
+            },
+            {
+              "name": "chat-id",
+              "value": "={{ $node[\"Telegram message\"].json[\"body\"][\"chat_id\"] }}"
+            },
+            {
+              "name": "=chat-title",
+              "value": "={{ $node[\"Telegram message\"].json[\"body\"][\"chat_title\"] }}"
             }
           ]
         },
@@ -217,7 +225,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "06887780-9eea-413f-a494-2f9eca1787ee",
+  "versionId": "2c92b90d-a2de-482f-aeb4-5f84c12f860e",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "38a2a5f52b4cad63c4ea75a093641d9c7391f96dec5f58893008641c305249bb"
