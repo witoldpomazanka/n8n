@@ -113,7 +113,7 @@ services:
       - custom_network
 
   bitcoin-notifier:
-    image: q910705/bitcoin-notifier:604a34a28f5a5cb7209d3474f5ad302dc0cf0c31
+    image: q910705/bitcoin-notifier:76351462d0de4667eec08a65b39440cd91eb84d1
     container_name: bitcoin-notifier
     restart: always
     volumes:
