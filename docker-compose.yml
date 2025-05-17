@@ -113,11 +113,11 @@ services:
       - custom_network
 
   bitcoin-notifier:
-    build: .
+    image: q910705/bitcoin-notifier:ab9dcd52b54afab0238aec5b4fccdbca214a5488
     container_name: bitcoin-notifier
     restart: always
     volumes:
-      - ./logs:/app/logs
+      - ./logs:/logs
     environment:
       - TZ=Europe/Warsaw
       - POSTGRES_USER=${POSTGRES_USER}
@@ -126,8 +126,6 @@ services:
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - COINS=BTC,ETH,SOL
-    depends_on:
-      - postgres
     networks:
       - custom_network
 
