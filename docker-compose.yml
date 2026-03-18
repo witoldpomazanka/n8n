@@ -60,7 +60,7 @@ services:
       - custom_network
 
   telethon-listener:
-    image: q910705/telegram-client:d008e6f71d4b2adb7027d8978d03eceef8bc8ee3
+    image: q910705/telegram-client:latest
     restart: always
     ports:
       - "0.0.0.0:8080:8080"
@@ -71,7 +71,6 @@ services:
       - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
       - TELEGRAM_PHONE=${TELEGRAM_PHONE}
       - N8N_WEBHOOK_URL=http://n8n:5678/webhook/telegram
-      - N8N_DEGEN_WEBHOOK_URL=http://n8n:5678/webhook/telegram-degen
       - TELEGRAM_SESSION_DIR=/data
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -79,9 +78,6 @@ services:
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - ALLOWED_SENDERS=Trading PRO
-      - IGNORED_SENDERS=PinkPunkTradingBot,Tom_Trader81,Scott Golden,Tonie Kapitał Chat,DevSellingBot Lounge,Trading PRO,🇵🇱 Krypto rozmowy 💬 MaxData.app
-      - DEGEN_GEMS_CHANNEL_NAMES=polski_degen - GEMS,prywatny
-      - CHAIN_TO_CHANNEL_MAPPING=SOL,PinkPunk Trading Bot,Buy 0.1 SOL,Base,PinkPunk Trading Bot,XXX,ETH,PinkPunk Trading Bot,XXX
     volumes:
       - telethon_session:/data
     depends_on:
@@ -91,7 +87,7 @@ services:
       - custom_network
 
   bybit-trade-zarabiara:
-    image: q910705/bybit-trade:cd790dec9dfa01012d0e4ec737029d2d69371719
+    image: q910705/bybit-trade:latest
     restart: always
     ports:
       - "0.0.0.0:8888:8888"
@@ -100,8 +96,6 @@ services:
       - BLOFIN_API_KEY=${BLOFIN_API_KEY}
       - BLOFIN_API_SECRET=${BLOFIN_API_SECRET}
       - BLOFIN_API_PASSPHRASE=${BLOFIN_API_PASSPHRASE}
-      - BYBIT_API_KEY=${BYBIT_API_KEY_TELEGRAM}
-      - BYBIT_API_SECRET=${BYBIT_API_SECRET_TELEGRAM}
       - MIN_USDT_AMOUNT_FOR_TRADE=${MIN_USDT_AMOUNT_FOR_TRADE}
       - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
       - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}

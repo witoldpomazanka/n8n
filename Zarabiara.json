@@ -90,88 +90,6 @@
       ],
       "id": "78d7ef42-722c-4b9f-afb8-c395e56a6a43",
       "name": "HTTP Request"
-    },
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "telegram-degen",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [
-        1040,
-        -80
-      ],
-      "id": "6c72a5d3-3ba2-4a0e-b6b0-e5ae9f37f3d2",
-      "name": "TELEGRAM DEGEN",
-      "webhookId": "13a043d3-434c-465b-ab7f-bccde12363cc"
-    },
-    {
-      "parameters": {
-        "modelId": {
-          "__rl": true,
-          "value": "gpt-4.1-2025-04-14",
-          "mode": "list",
-          "cachedResultName": "GPT-4.1-2025-04-14"
-        },
-        "messages": {
-          "values": [
-            {
-              "content": "=Act like a professional crypto trader.\nDetect if the content I provide below is a trader move, suggestion to buy a crypto coin.\nIf so, I would like you to respond in json format, without the comments.\nJust the json, no other text!\nIf not, or you are not sure, return json and nothing more than {\"content\": \"invalid\"}\nIf the value for a specific field is not determined, don't add it.\n\nMandatory keys are address and chain. If any of it is not present, return json {\"content\": \"invalid\"}\nThe message can be an update message, not a move, if so, return {\"content\": \"invalid\"}\n\nOutput json format, no other text, just the json, always, remember:\n{\n\"address\": \"0xFB7a83abe4F4A4E51c77B92E521390B769ff6467\",       // String, coin address\n\"chain\": \"Base\"                                                // string, can be \"Base\", \"ETH\" or \"SOL\"\n}\n\nmessage:\n{{$json[\"body\"][\"message\"]}}"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.openAi",
-      "typeVersion": 1.8,
-      "position": [
-        1280,
-        -80
-      ],
-      "id": "a18a9fb3-367d-4990-86b1-65acb930f0a2",
-      "name": "DEGEN CHAT GPT ASK",
-      "credentials": {
-        "openAiApi": {
-          "id": "h3ZxskVWdxA8ZroA",
-          "name": "OpenAi account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "http://telethon-listener:8080/degen-move",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "body": "={{$json[\"message\"][\"content\"]}}",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        }
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1620,
-        -80
-      ],
-      "id": "109f14c2-c1e8-4408-aa26-0111fec2962b",
-      "name": "TELEGRAM DEGEN MOVE"
     }
   ],
   "pinData": {},
@@ -197,35 +115,13 @@
           }
         ]
       ]
-    },
-    "TELEGRAM DEGEN": {
-      "main": [
-        [
-          {
-            "node": "DEGEN CHAT GPT ASK",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "DEGEN CHAT GPT ASK": {
-      "main": [
-        [
-          {
-            "node": "TELEGRAM DEGEN MOVE",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
     }
   },
   "active": true,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "2c92b90d-a2de-482f-aeb4-5f84c12f860e",
+  "versionId": "b84befaa-88ef-435d-8787-14bfd0115fe2",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "38a2a5f52b4cad63c4ea75a093641d9c7391f96dec5f58893008641c305249bb"
