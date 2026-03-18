@@ -90,12 +90,15 @@ services:
       - custom_network
 
   bybit-trade-zarabiara:
-    image: q910705/bybit-trade:76a4bab82083a3adde559bd95c67ab0fee1b00ef
+    image: q910705/bybit-trade:cd790dec9dfa01012d0e4ec737029d2d69371719
     restart: always
     ports:
       - "0.0.0.0:8888:8888"
     environment:
       - TZ=Europe/Warsaw
+      - BLOFIN_API_KEY=${BLOFIN_API_KEY}
+      - BLOFIN_API_SECRET=${BLOFIN_API_SECRET}
+      - BLOFIN_API_PASSPHRASE=${BLOFIN_API_PASSPHRASE}
       - BYBIT_API_KEY=${BYBIT_API_KEY_TELEGRAM}
       - BYBIT_API_SECRET=${BYBIT_API_SECRET_TELEGRAM}
       - MIN_USDT_AMOUNT_FOR_TRADE=${MIN_USDT_AMOUNT_FOR_TRADE}
