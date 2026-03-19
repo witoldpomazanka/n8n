@@ -13,6 +13,11 @@ services:
       - "0.0.0.0:5432:5432"
     networks:
       - custom_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   n8n:
     image: n8nio/n8n:1.89.2
@@ -41,6 +46,11 @@ services:
       - postgres
     networks:
       - custom_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   telethon-listener:
     image: q910705/telegram-client:latest
@@ -68,6 +78,11 @@ services:
       - postgres
     networks:
       - custom_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   bybit-trade-zarabiara:
     image: q910705/bybit-trade:latest
@@ -92,6 +107,11 @@ services:
       - postgres
     networks:
       - custom_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   n8n_postgres_data:
