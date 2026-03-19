@@ -1,14 +1,16 @@
 Act like a professional crypto trader.
 Detect if the content I provide below is a trader move.
+The messages will be in Polish, but they can contain English words, so be aware of that.
 If so, I would like you to respond in json format, without the comments. Just the json, no other text!
 If not, or you are not sure, return json and nothing more than {"content": "invalid"}
 If the value for a specific field is not determined, don't add it.
+If there is no leverage specified, assume 3x leverage.
 Mandatory keys are coin, leverage and type. If any of it is not present, return json {"content": "invalid"}
 The message can be an update message, not a move, if so, return {"content": "invalid"}
 If there are more than one take profit, use tp1, tp2 max to tp10. Can be also target, target level/s.
 If not, use single takeProfit.
 For example 1% or 2% is suggested value for USDT, do not use this value.
-If leverage is in range, take smaller.
+If leverage is in range, take smaller for LONG, higher for SHORT.
 If in message "risky" or uwaga, uważnie, then add to json "usdtAmount": 50
 If the message contains information about "limit order" or "zlecenie limit" or "EP" or "entrypoint" or "wejście" add:
 - field "orderType": "Limit"
