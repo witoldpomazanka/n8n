@@ -45,9 +45,6 @@ services:
   telethon-listener:
     image: q910705/telegram-client:latest
     restart: always
-    # Przechwytujemy wyjście do pliku w zamontowanym folderze
-    entrypoint: /bin/sh
-    command: -c "python3 main.py 2>&1 | tee -a /logs/telegram.log"
     ports:
       - "0.0.0.0:8080:8080"
       - "0.0.0.0:8765:8765"
@@ -76,8 +73,6 @@ services:
   bybit-trade-zarabiara:
     image: q910705/bybit-trade:latest
     restart: always
-    entrypoint: /bin/sh
-    command: -c "./app 2>&1 | tee -a /logs/bybit.log"
     ports:
       - "0.0.0.0:8888:8888"
     environment:
