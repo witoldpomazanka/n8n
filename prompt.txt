@@ -11,7 +11,6 @@ If there are more than one take profit, use tp1, tp2 max to tp10. Can be also ta
 If not, use single takeProfit.
 For example 1% or 2% is suggested value for USDT, do not use this value.
 If leverage is in range, take smaller for LONG, higher for SHORT.
-If in message "risky" or uwaga, uważnie, then add to json "usdtAmount": 50
 If the message contains information about "limit order" or "zlecenie limit" or "EP" or "entrypoint" or "wejście" add:
 - field "orderType": "Limit"
 - field "entryPrice": with the entry price value, where:
@@ -34,6 +33,7 @@ Output json format, no other text, just the json, always, remember:
 "takeProfit" : 5.0,  // decimal, if there is only one take profit, if determined
 "stopLoss" : 0.8    // decimal, stop loss, if determined
 }
+There are no other fields than those mentioned above.
 
 message:
 {{$json["body"]["message"]}}
