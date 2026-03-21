@@ -13,11 +13,6 @@ services:
       - "0.0.0.0:5432:5432"
     networks:
       - custom_network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   n8n:
     image: n8nio/n8n:1.89.2
@@ -46,15 +41,13 @@ services:
       - postgres
     networks:
       - custom_network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   telethon-listener:
     image: q910705/telegram-client:latest
     restart: always
+    # Przechwytujemy wyjście do pliku w zamontowanym folderze
+    entrypoint: /bin/sh
+    command: -c "python3 main.py 2>&1 | tee -a /logs/telegram.log"
     ports:
       - "0.0.0.0:8080:8080"
       - "0.0.0.0:8765:8765"
@@ -73,20 +66,18 @@ services:
       - ALLOWED_SENDERS=[Trading PRO]Trader Rookie,[Trading PRO]Trader Walesz | AI Trading,[Trading PRO]Trader Albert,Zarabiara,[KDP Premium+]🟢 Zagrania naszych traderów - mniej ryzykowne
     volumes:
       - telethon_session:/data
+      - ./logs/telegram:/logs
     depends_on:
       - n8n
       - postgres
     networks:
       - custom_network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   bybit-trade-zarabiara:
     image: q910705/bybit-trade:latest
     restart: always
+    entrypoint: /bin/sh
+    command: -c "./app 2>&1 | tee -a /logs/bybit.log"
     ports:
       - "0.0.0.0:8888:8888"
     environment:
@@ -107,11 +98,6 @@ services:
       - postgres
     networks:
       - custom_network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
 volumes:
   n8n_postgres_data:
