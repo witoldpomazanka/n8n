@@ -93,6 +93,8 @@ services:
       - postgres
     networks:
       - custom_network
+    volumes:
+      - ./logs/bybit:/logs
 
 volumes:
   n8n_postgres_data:
