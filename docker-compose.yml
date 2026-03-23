@@ -60,7 +60,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - ALLOWED_SENDERS=[Trading PRO]Trader Rookie,[Trading PRO]Trader Walesz | AI Trading,[Trading PRO]Trader Albert,Zarabiara,[KDP Premium+]🟢 Zagrania naszych traderów - mniej ryzykowne
+      - ALLOWED_SENDERS=[Trading PRO]Trader Rookie,[Trading PRO]Trader Walesz | AI Trading,[Trading PRO]Trader Albert,[KDP Premium+]🟢 Zagrania naszych traderów - mniej ryzykowne,Zarabiara
     volumes:
       - telethon_session:/data
       - ./logs/telegram:/logs
